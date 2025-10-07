@@ -673,6 +673,7 @@
             floatingImageContainer.classList.add('hidden');
             floatingImage.src = '';
             overlayImageData = null;
+            overlayPromptInput.value = ''; // Borra el texto del prompt
             floatingImageContainer.style.transform = '';
             floatingImageContainer.removeAttribute('data-x');
             floatingImageContainer.removeAttribute('data-y');
