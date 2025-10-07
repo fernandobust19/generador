@@ -455,8 +455,26 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    // Reset previous transformations before showing the new image
+                    floatingImageContainer.style.transform = '';
+                    floatingImageContainer.style.width = '150px'; // Set initial small size
+                    floatingImageContainer.style.height = ''; // Let height be auto
+                    floatingImageContainer.removeAttribute('data-x');
+                    floatingImageContainer.removeAttribute('data-y');
+                    floatingImageContainer.removeAttribute('data-rotate');
+                    floatingImageContainer.removeAttribute('data-scale');
+
                     floatingImage.src = e.target.result;
                     floatingImageContainer.classList.remove('hidden');
+
+                    // Center the new small image
+                    const parentRect = resultContainer.getBoundingClientRect();
+                    const initialX = (parentRect.width - 150) / 2;
+                    const initialY = (parentRect.height - 150) / 2; // Approximate height
+                    floatingImageContainer.style.transform = `translate(${initialX}px, ${initialY}px)`;
+                    floatingImageContainer.setAttribute('data-x', initialX);
+                    floatingImageContainer.setAttribute('data-y', initialY);
+
                     const [header, base64Data] = e.target.result.split(',');
                     overlayImageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
                 };
@@ -600,7 +618,7 @@
             handleImageGeneration(prompt, [imageData], { mask: maskData });
         });
 
-        implementOverlayBtn.addEventListener('click', () => {
+        implementOverlayBtn.addEventListener('click', async () => {
             const prompt = overlayPromptInput.value.trim();
             if (!prompt) return showError('Describe cómo implementar la imagen flotante.');
             if (!overlayImageData) return showError('Carga una imagen flotante primero.');
@@ -618,9 +636,21 @@
                 y: parseFloat(floatingImageContainer.dataset.y || 0),
                 width: floatingImageContainer.clientWidth,
                 height: floatingImageContainer.clientHeight,
-                rotation: parseFloat(floatingImageContainer.dataset.rotate || 0)
+                rotation: parseFloat(floatingImageContainer.dataset.rotate || 0),
+                scale: parseFloat(floatingImageContainer.dataset.scale || 1)
             };
-            handleImageGeneration(prompt, [baseImage], { overlay });
+            
+            await handleImageGeneration(prompt, [baseImage], { overlay });
+
+            // Hide and reset the floating image after generation is complete
+            floatingImageContainer.classList.add('hidden');
+            floatingImage.src = '';
+            overlayImageData = null;
+            floatingImageContainer.style.transform = '';
+            floatingImageContainer.removeAttribute('data-x');
+            floatingImageContainer.removeAttribute('data-y');
+            floatingImageContainer.removeAttribute('data-rotate');
+            floatingImageContainer.removeAttribute('data-scale');
         });
 
         function activateMasking() {
@@ -822,10 +852,11 @@
                 listeners: {
                     move (event) {
                         const target = event.target
-                        const angle = (parseFloat(target.getAttribute('data-rotate')) || 0) + event.da;
                         const scale = (parseFloat(target.getAttribute('data-scale')) || 1) * (1 + event.ds);
+                        const angle = (parseFloat(target.getAttribute('data-rotate')) || 0) + event.da;
 
-                        target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg) scale(${scale})`;
+                        // Apply scale to the element's dimensions directly for better prompt data
+                        target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg)`;
                         
                         target.setAttribute('data-rotate', angle);
                         target.setAttribute('data-scale', scale);
