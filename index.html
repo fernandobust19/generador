@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Combinador de Imágenes con IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -120,6 +121,17 @@
             cursor: crosshair;
         }
 
+        #floating-image-container {
+            position: absolute;
+            touch-action: none; /* Required for interact.js */
+            user-select: none;
+            box-sizing: border-box;
+            border: 2px solid rgba(99, 102, 241, 0.7); /* Dashed border to show it's an element */
+        }
+        #floating-image-container img {
+            width: 100%;
+            height: 100%;
+        }
         /* Carousel Styles */
         .carousel {
             overflow-x: scroll;
@@ -204,6 +216,19 @@
             </div>
         </div>
 
+        <!-- Overlay Section -->
+        <div id="overlay-section" class="hidden w-full mb-6 p-3 border border-indigo-500/30 rounded-lg bg-gray-900/20">
+             <p class="text-indigo-300 mb-2 text-xs text-left">Añade una imagen superpuesta. Arrástrala, redimensiónala y rótala sobre la imagen de fondo.</p>
+            <div class="flex flex-col sm:flex-row items-center gap-2">
+                <button id="upload-overlay-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap">Cargar Imagen Flotante</button>
+                <input type="file" id="overlay-image-upload" class="hidden" accept="image/*">
+                <div class="relative flex-grow w-full sm:w-auto">
+                    <input type="text" id="overlay-prompt-input" class="w-full pl-3 pr-10 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: un fantasma transparente sobre el bosque...">
+                </div>
+                <button id="implement-overlay-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">Implementar</button>
+            </div>
+        </div>
+
         <!-- Result section with Carousel -->
         <div id="result-container" class="result-container relative w-full border rounded-lg p-2 mt-6 min-h-[300px] flex items-center justify-center shadow-inner">
              <button id="prev-btn" class="carousel-btn hidden absolute left-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
@@ -217,6 +242,9 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div id="floating-image-container" class="hidden">
+                <img id="floating-image" src="" alt="Imagen flotante">
             </div>
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
@@ -269,6 +297,15 @@
         const inpaintPromptInput = document.getElementById('inpaint-prompt-input');
         const inpaintApplyBtn = document.getElementById('inpaint-apply-btn');
         
+        // Overlay Section
+        const overlaySection = document.getElementById('overlay-section');
+        const uploadOverlayBtn = document.getElementById('upload-overlay-btn');
+        const overlayImageUpload = document.getElementById('overlay-image-upload');
+        const overlayPromptInput = document.getElementById('overlay-prompt-input');
+        const implementOverlayBtn = document.getElementById('implement-overlay-btn');
+        const floatingImageContainer = document.getElementById('floating-image-container');
+        const floatingImage = document.getElementById('floating-image');
+
         // Carousel Elements
         const carousel = document.getElementById('carousel');
         const carouselTrack = document.getElementById('carousel-track');
@@ -299,6 +336,7 @@
         let cameraStream = null;
         let isMaskingActive = false;
         let isDrawing = false;
+        let overlayImageData = null;
 
         // La API Key se gestiona de forma segura en el servidor.
 
@@ -409,6 +447,22 @@
             sourceModal.classList.add('hidden'); // Auto-close modal
         }
 
+        // --- Overlay Image Logic ---
+        uploadOverlayBtn.addEventListener('click', () => overlayImageUpload.click());
+
+        overlayImageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    floatingImage.src = e.target.result;
+                    floatingImageContainer.classList.remove('hidden');
+                    const [header, base64Data] = e.target.result.split(',');
+                    overlayImageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
         // --- API & Generation Logic ---
         async function callApiWithBackoff(apiUrl, payload) {
@@ -425,12 +479,26 @@
             return await response.json();
         }
 
-        async function handleImageGeneration(prompt, images, mask = null) {
+        async function handleImageGeneration(prompt, images, { mask = null, overlay = null } = {}) {
             setLoadingState(true);
             deactivateMasking();
             try {
                 // Ahora llamamos a nuestro propio backend
                 const apiUrl = '/api/generate';
+
+                // Si hay una imagen superpuesta, el prompt se construye de forma especial
+                if (overlay && overlay.image) {
+                    prompt = `Toma la primera imagen como fondo. Luego, superpón la segunda imagen (la imagen flotante) sobre el fondo en la posición, tamaño y rotación especificados. Finalmente, aplica esta instrucción creativa a la composición: "${prompt}".
+                    - Posición de la imagen flotante (top, left): ${overlay.y}px, ${overlay.x}px
+                    - Tamaño de la imagen flotante (width, height): ${overlay.width}px, ${overlay.height}px
+                    - Rotación de la imagen flotante: ${overlay.rotation} grados.
+                    La segunda imagen es la que se debe transformar y colocar. La primera es solo el lienzo de fondo.`;
+                    
+                    // El orden es importante: primero el fondo, luego la imagen a superponer
+                    images.push(overlay.image);
+                }
+
+
                 const parts = [{ text: prompt }];
                 images.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }));
                 if (mask) parts.push({ inlineData: { mimeType: mask.mimeType, data: mask.data } });
@@ -469,7 +537,7 @@
             const validImages = uploadedImagesData.filter(img => img !== null);
             if (validImages.length === 0) return showError('Por favor, sube al menos una imagen.');
             if (!prompt) return showError('Por favor, describe cómo combinar las imágenes.');
-            handleImageGeneration(prompt, validImages, null);
+            handleImageGeneration(prompt, validImages);
         });
 
         editBtn.addEventListener('click', () => {
@@ -482,7 +550,7 @@
             const mimeType = header.match(/:(.*?);/)[1];
             const imageData = { mimeType, data: base64Data };
             
-            handleImageGeneration(prompt, [imageData], null);
+            handleImageGeneration(prompt, [imageData]);
         });
         
         rewriteBtn.addEventListener('click', async () => {
@@ -529,7 +597,30 @@
             const maskMimeType = maskHeader.match(/:(.*?);/)[1];
             const maskData = { mimeType: maskMimeType, data: maskBase64Data };
 
-            handleImageGeneration(prompt, [imageData], maskData);
+            handleImageGeneration(prompt, [imageData], { mask: maskData });
+        });
+
+        implementOverlayBtn.addEventListener('click', () => {
+            const prompt = overlayPromptInput.value.trim();
+            if (!prompt) return showError('Describe cómo implementar la imagen flotante.');
+            if (!overlayImageData) return showError('Carga una imagen flotante primero.');
+            if (generatedImagesHistory.length === 0) return showError('No hay imagen de fondo para editar.');
+
+            // Get base image
+            const currentImage = generatedImagesHistory[currentImageIndex];
+            const [header, base64Data] = currentImage.split(',');
+            const baseImage = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
+
+            // Get overlay image and its transformations
+            const overlay = {
+                image: overlayImageData,
+                x: parseFloat(floatingImageContainer.dataset.x || 0),
+                y: parseFloat(floatingImageContainer.dataset.y || 0),
+                width: floatingImageContainer.clientWidth,
+                height: floatingImageContainer.clientHeight,
+                rotation: parseFloat(floatingImageContainer.dataset.rotate || 0)
+            };
+            handleImageGeneration(prompt, [baseImage], { overlay });
         });
 
         function activateMasking() {
@@ -551,6 +642,7 @@
             isDrawing = false;
             maskCanvas.classList.add('hidden');
             inpaintSection.classList.add('hidden');
+            overlaySection.classList.toggle('hidden', generatedImagesHistory.length === 0);
             if (generatedImagesHistory.length > 0) editSection.classList.remove('hidden');
         }
 
@@ -583,6 +675,7 @@
             const hasImages = generatedImagesHistory.length > 0;
             saveBtn.classList.toggle('hidden', !hasImages);
             editSection.classList.toggle('hidden', !hasImages);
+            overlaySection.classList.toggle('hidden', !hasImages);
             deactivateMasking(); // Deactivate mask when changing image
         }
 
@@ -662,6 +755,7 @@
             generateBtn.disabled = isLoading;
             editBtn.disabled = isLoading;
             inpaintApplyBtn.disabled = isLoading;
+            implementOverlayBtn.disabled = isLoading;
         }
 
         function showError(message) {
@@ -677,6 +771,49 @@
         editBtn.textContent = 'Editar Área';
         editBtn.addEventListener('click', activateMasking);
 
+        // --- Interact.js for Floating Image ---
+        interact(floatingImageContainer)
+            .draggable({
+                listeners: {
+                    move(event) {
+                        const target = event.target;
+                        const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                        const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+                        target.style.transform = `translate(${x}px, ${y}px) rotate(${target.getAttribute('data-rotate') || 0}deg)`;
+                        target.setAttribute('data-x', x);
+                        target.setAttribute('data-y', y);
+                    }
+                },
+                inertia: true,
+                modifiers: [
+                    interact.modifiers.restrictRect({
+                        restriction: 'parent',
+                        endOnly: true
+                    })
+                ]
+            })
+            .resizable({
+                edges: { left: true, right: true, bottom: true, top: true },
+                listeners: {
+                    move(event) {
+                        let { x, y } = event.target.dataset;
+                        x = (parseFloat(x) || 0);
+                        y = (parseFloat(y) || 0);
+                        Object.assign(event.target.style, { width: `${event.rect.width}px`, height: `${event.rect.height}px` });
+                    }
+                }
+            })
+            .gesturable({ // For rotation with touch
+                listeners: {
+                    move (event) {
+                        const target = event.target
+                        const angle = (parseFloat(target.getAttribute('data-rotate')) || 0) + event.da
+                        target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg)`;
+                        target.setAttribute('data-rotate', angle)
+                    }
+                }
+            });
     </script>
 </body>
 </html>
