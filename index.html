@@ -170,17 +170,17 @@
         </div>
 
         <!-- Input section -->
-        <div class="relative w-full mb-6">
-            <input type="text" id="prompt-input" class="w-full pl-3 pr-10 py-2 text-sm bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: Fusiona las imágenes en un estilo de acuarela...">
-            <button id="rewrite-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 group" title="Mejorar prompt con IA">
-                 <svg id="gemini-icon" class="w-5 h-5 text-gray-400 group-hover:text-indigo-400 transition" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5.5C12 5.22386 12.2239 5 12.5 5C12.7761 5 13 5.22386 13 5.5V6.5C13 6.77614 12.7761 7 12.5 7C12.2239 7 12 6.77614 12 6.5V5.5ZM8.5 7C8.22386 7 8 7.22386 8 7.5C8 7.77614 8.22386 8 8.5 8H9.5C9.77614 8 10 7.77614 10 7.5C10 7.22386 9.77614 7 9.5 7H8.5ZM6 12.5C6 12.239 5.77614 12 5.5 12H4.5C4.22386 12 4 12.2239 4 12.5C4 12.7761 4.22386 13 4.5 13H5.5C5.77614 13 6 12.7761 6 12.5ZM8.5 17C8.22386 17 8 17.2239 8 17.5C8 17.7761 8.22386 18 8.5 18H9.5C9.77614 18 10 17.7761 10 17.5C10 17.2239 9.77614 17 9.5 17H8.5ZM13 17.5C13 17.2239 12.7761 17 12.5 17C12.2239 17 12 17.2239 12 17.5V18.5C12 18.7761 12.2239 19 12.5 19C12.7761 19 13 18.7761 13 18.5V17.5ZM19 12.5C19 12.2239 18.7761 12 18.5 12H17.5C17.2239 12 17 12.2239 17 12.5C17 12.7761 17.2239 13 17.5 13H18.5C18.7761 13 19 12.7761 19 12.5ZM15.5 8C15.7761 8 16 7.77614 16 7.5C16 7.22386 15.7761 7 15.5 7H14.5C14.2239 7 14 7.22386 14 7.5C14 7.77614 14.2239 8 14.5 8H15.5Z" fill="currentColor"></path></svg>
-            </button>
-        </div>
-        <div class="flex justify-center gap-4 mb-6">
-            <button id="generate-btn" class="styled-button btn-primary py-2 px-5 text-sm rounded-lg">
+        <div class="flex items-center gap-2 w-full mb-6">
+            <div class="relative flex-grow">
+                <input type="text" id="prompt-input" class="w-full pl-3 pr-10 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Describe tu idea...">
+                <button id="rewrite-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 group" title="Mejorar prompt con IA">
+                    <svg id="gemini-icon" class="w-5 h-5 text-gray-400 group-hover:text-indigo-400 transition" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5.5C12 5.22386 12.2239 5 12.5 5C12.7761 5 13 5.22386 13 5.5V6.5C13 6.77614 12.7761 7 12.5 7C12.2239 7 12 6.77614 12 6.5V5.5ZM8.5 7C8.22386 7 8 7.22386 8 7.5C8 7.77614 8.22386 8 8.5 8H9.5C9.77614 8 10 7.77614 10 7.5C10 7.22386 9.77614 7 9.5 7H8.5ZM6 12.5C6 12.239 5.77614 12 5.5 12H4.5C4.22386 12 4 12.2239 4 12.5C4 12.7761 4.22386 13 4.5 13H5.5C5.77614 13 6 12.7761 6 12.5ZM8.5 17C8.22386 17 8 17.2239 8 17.5C8 17.7761 8.22386 18 8.5 18H9.5C9.77614 18 10 17.7761 10 17.5C10 17.2239 9.77614 17 9.5 17H8.5ZM13 17.5C13 17.2239 12.7761 17 12.5 17C12.2239 17 12 17.2239 12 17.5V18.5C12 18.7761 12.2239 19 12.5 19C12.7761 19 13 18.7761 13 18.5V17.5ZM19 12.5C19 12.2239 18.7761 12 18.5 12H17.5C17.2239 12 17 12.2239 17 12.5C17 12.7761 17.2239 13 17.5 13H18.5C18.7761 13 19 12.7761 19 12.5ZM15.5 8C15.7761 8 16 7.77614 16 7.5C16 7.22386 15.7761 7 15.5 7H14.5C14.2239 7 14 7.22386 14 7.5C14 7.77614 14.2239 8 14.5 8H15.5Z" fill="currentColor"></path></svg>
+                </button>
+            </div>
+            <button id="generate-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">
                 Combinar
             </button>
-            <button id="save-btn" class="hidden styled-button btn-secondary py-2 px-5 text-sm rounded-lg">
+            <button id="save-btn" class="hidden styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap">
                 Guardar
             </button>
         </div>
