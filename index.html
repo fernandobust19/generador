@@ -528,11 +528,16 @@
 
                 // Si hay una imagen superpuesta, el prompt se construye de forma especial
                 if (overlay && overlay.image) {
-                    prompt = `Toma la primera imagen como fondo. Luego, superpón la segunda imagen (la imagen flotante) sobre el fondo en la posición, tamaño y rotación especificados. Finalmente, aplica esta instrucción creativa a la composición: "${prompt}".
-                    - Posición de la imagen flotante (top, left): ${overlay.y}px, ${overlay.x}px
-                    - Tamaño de la imagen flotante (width, height): ${overlay.width}px, ${overlay.height}px
-                    - Rotación de la imagen flotante: ${overlay.rotation} grados.
-                    La segunda imagen es la que se debe transformar y colocar. La primera es solo el lienzo de fondo.`;
+                    const bgImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
+                    const bgWidth = bgImageElement.clientWidth;
+                    const bgHeight = bgImageElement.clientHeight;
+
+                    prompt = `Toma la primera imagen como fondo (lienzo). El tamaño del lienzo es ${bgWidth}px de ancho por ${bgHeight}px de alto.
+                    Ahora, superpón la segunda imagen (la imagen flotante) sobre este lienzo.
+                    - Posición de la imagen flotante (coordenadas top, left desde la esquina superior izquierda del lienzo): ${Math.round(overlay.y)}px, ${Math.round(overlay.x)}px.
+                    - Tamaño de la imagen flotante: ${Math.round(overlay.width)}px de ancho por ${Math.round(overlay.height)}px de alto.
+                    - Rotación de la imagen flotante: ${Math.round(overlay.rotation)} grados.
+                    Finalmente, integra la imagen flotante en el fondo aplicando esta instrucción creativa: "${prompt}". La segunda imagen es la que se debe transformar y colocar; la primera es solo el lienzo.`;
                     
                     // El orden es importante: primero el fondo, luego la imagen a superponer
                     images.push(overlay.image);
