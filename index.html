@@ -199,9 +199,9 @@
         
         <!-- Edit Section -->
         <div id="edit-section" class="hidden w-full mb-6">
-            <div class="relative flex flex-col sm:flex-row gap-4">
-                <input type="text" id="edit-prompt-input" class="w-full pl-3 py-2 text-sm bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
-                <button id="edit-btn" class="styled-button btn-primary py-2 px-5 text-sm rounded-lg whitespace-nowrap">
+            <div class="relative flex flex-col sm:flex-row gap-2">
+                <input type="text" id="edit-prompt-input" class="w-full pl-3 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
+                <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">
                     Editar
                 </button>
             </div>
@@ -774,6 +774,7 @@
         // --- Interact.js for Floating Image ---
         interact(floatingImageContainer)
             .draggable({
+                // enable inertial throwing
                 listeners: {
                     move(event) {
                         const target = event.target;
@@ -785,6 +786,7 @@
                         target.setAttribute('data-y', y);
                     }
                 },
+                // enable inertial throwing
                 inertia: true,
                 modifiers: [
                     interact.modifiers.restrictRect({
@@ -794,23 +796,39 @@
                 ]
             })
             .resizable({
+                // resize from all edges
                 edges: { left: true, right: true, bottom: true, top: true },
                 listeners: {
                     move(event) {
-                        let { x, y } = event.target.dataset;
-                        x = (parseFloat(x) || 0);
-                        y = (parseFloat(y) || 0);
-                        Object.assign(event.target.style, { width: `${event.rect.width}px`, height: `${event.rect.height}px` });
+                        const target = event.target;
+                        let x = (parseFloat(target.getAttribute('data-x')) || 0);
+                        let y = (parseFloat(target.getAttribute('data-y')) || 0);
+
+                        // update the element's style
+                        target.style.width = event.rect.width + 'px';
+                        target.style.height = event.rect.height + 'px';
+
+                        // translate when resizing from top or left edges
+                        x += event.deltaRect.left;
+                        y += event.deltaRect.top;
+
+                        target.style.transform = `translate(${x}px, ${y}px) rotate(${target.getAttribute('data-rotate') || 0}deg)`;
+                        target.setAttribute('data-x', x);
+                        target.setAttribute('data-y', y);
                     }
                 }
             })
-            .gesturable({ // For rotation with touch
+            .gesturable({ // For pinch-to-zoom and rotation on touch devices
                 listeners: {
                     move (event) {
                         const target = event.target
-                        const angle = (parseFloat(target.getAttribute('data-rotate')) || 0) + event.da
-                        target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg)`;
-                        target.setAttribute('data-rotate', angle)
+                        const angle = (parseFloat(target.getAttribute('data-rotate')) || 0) + event.da;
+                        const scale = (parseFloat(target.getAttribute('data-scale')) || 1) * (1 + event.ds);
+
+                        target.style.transform = `translate(${target.getAttribute('data-x') || 0}px, ${target.getAttribute('data-y') || 0}px) rotate(${angle}deg) scale(${scale})`;
+                        
+                        target.setAttribute('data-rotate', angle);
+                        target.setAttribute('data-scale', scale);
                     }
                 }
             });
