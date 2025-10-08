@@ -231,6 +231,9 @@
                     <button id="tool-rect" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección rectangular">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm1 1v10h10V4H4z" clip-rule="evenodd" /></svg>
                     </button>
+                    <button id="tool-circle" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección circular">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM2 10a8 8 0 1116 0 8 8 0 01-16 0z" clip-rule="evenodd" /></svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -337,6 +340,7 @@
         // Drawing Tools
         const toolPencil = document.getElementById('tool-pencil');
         const toolRect = document.getElementById('tool-rect');
+        const toolCircle = document.getElementById('tool-circle');
 
 
         // Inpaint Section
@@ -386,7 +390,7 @@
         let isDrawing = false;
         let overlayImageData = null;
 
-        let drawingTool = 'pencil'; // 'pencil' or 'rect'
+        let drawingTool = 'pencil'; // 'pencil', 'rect', or 'circle'
         let startPos = { x: 0, y: 0 };
 
         // La API Key se gestiona de forma segura en el servidor.
@@ -855,6 +859,12 @@
             } else if (drawingTool === 'rect') {
                 maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
                 maskCtx.strokeRect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y);
+            } else if (drawingTool === 'circle') {
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                maskCtx.beginPath(); // Iniciar un nuevo trazado para el círculo
+                const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2));
+                maskCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+                maskCtx.stroke(); // Dibujar el contorno del círculo
             }
         }
 
@@ -871,7 +881,7 @@
             maskCtx.lineCap = 'round';
             maskCtx.lineJoin = 'round';
 
-            if (drawingTool === 'rect') {
+            if (drawingTool === 'rect' || drawingTool === 'circle') {
                 maskCtx.lineWidth = 2; // Thinner line for rectangle preview
             }
         });
@@ -883,6 +893,14 @@
                 maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
                 maskCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Fill the final rectangle
                 maskCtx.fillRect(startPos.x, startPos.y, endPos.x - startPos.x, endPos.y - startPos.y);
+            } else if (drawingTool === 'circle') {
+                const endPos = getMousePos(maskCanvas, e);
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                const radius = Math.sqrt(Math.pow(endPos.x - startPos.x, 2) + Math.pow(endPos.y - startPos.y, 2));
+                maskCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Fill the final circle
+                maskCtx.beginPath();
+                maskCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+                maskCtx.fill();
             }
         });
         maskCanvas.addEventListener('mouseout', () => { isDrawing = false; });
@@ -919,6 +937,7 @@
         // Add listeners for drawing tools
         toolPencil.addEventListener('click', () => activateMasking('pencil'));
         toolRect.addEventListener('click', () => activateMasking('rect'));
+        toolCircle.addEventListener('click', () => activateMasking('circle'));
 
         // --- Interact.js for Floating Image ---
         function updateTransform(target) {
