@@ -6,6 +6,7 @@
     <title>Combinador de Imágenes con IA</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪄</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -213,9 +214,6 @@
             <button id="generate-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">
                 Combinar
             </button>
-            <button id="save-btn" class="hidden styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap">
-                Guardar
-            </button>
         </div>
         
         <!-- Edit Section -->
@@ -246,7 +244,10 @@
                 <div class="relative flex-grow w-full sm:w-auto">
                     <input type="text" id="overlay-prompt-input" class="w-full pl-3 pr-10 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: un fantasma transparente sobre el bosque...">
                 </div>
-                <button id="implement-overlay-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">Implementar</button>
+                <button id="implement-overlay-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
+                    <span>Implementar</span>
+                </button>
             </div>
         </div>
 
@@ -272,6 +273,10 @@
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
             <div id="error-message" class="hidden text-red-400 absolute"></div>
+            <div id="save-actions" class="hidden absolute bottom-4 right-4 z-20 flex gap-2">
+                <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap">Guardar</button>
+                <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">Guardar Álbum</button>
+            </div>
         </div>
 
     </div>
@@ -299,7 +304,8 @@
     <script>
         // --- DOM Elements ---
         const generateBtn = document.getElementById('generate-btn');
-        const saveBtn = document.getElementById('save-btn');
+        const saveActions = document.getElementById('save-actions');
+        const saveBtn = document.getElementById('save-btn'); // Botón individual
         const promptInput = document.getElementById('prompt-input');
         const rewriteBtn = document.getElementById('rewrite-btn');
         const geminiIcon = document.getElementById('gemini-icon');
@@ -308,6 +314,7 @@
         const resultContainer = document.getElementById('result-container');
         const loader = document.getElementById('loader');
         const errorMessage = document.getElementById('error-message');
+        const saveAlbumBtn = document.getElementById('save-album-btn');
         const placeholderSlide = document.getElementById('placeholder-slide');
 
         // Edit Section
@@ -730,13 +737,39 @@
             prevBtn.classList.toggle('hidden', currentImageIndex === 0);
             nextBtn.classList.toggle('hidden', currentImageIndex === generatedImagesHistory.length - 1);
             
-            // Show/hide save button and edit section
+            // Show/hide save buttons and edit section
             const hasImages = generatedImagesHistory.length > 0;
-            saveBtn.classList.toggle('hidden', !hasImages);
+            saveActions.classList.toggle('hidden', !hasImages);
             editSection.classList.toggle('hidden', !hasImages);
             overlaySection.classList.toggle('hidden', !hasImages);
+            saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2);
             deactivateMasking(); // Deactivate mask when changing image
         }
+
+        saveAlbumBtn.addEventListener('click', async () => {
+            if (generatedImagesHistory.length < 2) return;
+
+            setLoadingState(true); // Muestra el loader
+            try {
+                const zip = new JSZip();
+                generatedImagesHistory.forEach((dataUrl, index) => {
+                    const base64Data = dataUrl.split(',')[1];
+                    zip.file(`imagen-generada-${index + 1}.png`, base64Data, { base64: true });
+                });
+
+                const content = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = 'album-imagenes-generadas.zip';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            } catch (error) {
+                console.error("Error creando el archivo zip:", error);
+                showError("No se pudo crear el álbum.");
+            } finally {
+                setLoadingState(false); // Oculta el loader
+            }
+        });
 
         prevBtn.addEventListener('click', () => {
             if (currentImageIndex > 0) {
