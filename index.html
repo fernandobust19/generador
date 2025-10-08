@@ -1090,8 +1090,8 @@
             const imgRect = currentImageElement.getBoundingClientRect();
             const containerRect = resultContainer.getBoundingClientRect();
 
-            const scaleX = currentImageElement.naturalWidth / currentImageElement.clientWidth;
-            const scaleY = currentImageElement.naturalHeight / currentImageElement.clientHeight;
+            const scaleX = currentImageElement.naturalWidth / imgRect.width;
+            const scaleY = currentImageElement.naturalHeight / imgRect.height;
             
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = currentImageElement.naturalWidth;
