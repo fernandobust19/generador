@@ -207,8 +207,11 @@
         <div class="flex items-center gap-2 w-full mb-6">
             <div class="relative flex-grow">
                 <input type="text" id="prompt-input" class="w-full pl-3 pr-10 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Describe tu idea...">
-                <button id="rewrite-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 group" title="Mejorar prompt con IA">
-                    <svg id="gemini-icon" class="w-5 h-5 text-gray-400 group-hover:text-indigo-400 transition" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5.5C12 5.22386 12.2239 5 12.5 5C12.7761 5 13 5.22386 13 5.5V6.5C13 6.77614 12.7761 7 12.5 7C12.2239 7 12 6.77614 12 6.5V5.5ZM8.5 7C8.22386 7 8 7.22386 8 7.5C8 7.77614 8.22386 8 8.5 8H9.5C9.77614 8 10 7.77614 10 7.5C10 7.22386 9.77614 7 9.5 7H8.5ZM6 12.5C6 12.239 5.77614 12 5.5 12H4.5C4.22386 12 4 12.2239 4 12.5C4 12.7761 4.22386 13 4.5 13H5.5C5.77614 13 6 12.7761 6 12.5ZM8.5 17C8.22386 17 8 17.2239 8 17.5C8 17.7761 8.22386 18 8.5 18H9.5C9.77614 18 10 17.7761 10 17.5C10 17.2239 9.77614 17 9.5 17H8.5ZM13 17.5C13 17.2239 12.7761 17 12.5 17C12.2239 17 12 17.2239 12 17.5V18.5C12 18.7761 12.2239 19 12.5 19C12.7761 19 13 18.7761 13 18.5V17.5ZM19 12.5C19 12.2239 18.7761 12 18.5 12H17.5C17.2239 12 17 12.2239 17 12.5C17 12.7761 17.2239 13 17.5 13H18.5C18.7761 13 19 12.7761 19 12.5ZM15.5 8C15.7761 8 16 7.77614 16 7.5C16 7.22386 15.7761 7 15.5 7H14.5C14.2239 7 14 7.22386 14 7.5C14 7.77614 14.2239 8 14.5 8H15.5Z" fill="currentColor"></path></svg>
+                <button id="rewrite-btn" class="absolute inset-y-0 right-0 flex items-center pr-3 group" title="Generar idea de prompt con IA">
+                    <svg id="gemini-icon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400 group-hover:text-indigo-400 transition" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M15.5 2.5a.5.5 0 00-.5-.5h-10a.5.5 0 00-.5.5v10a.5.5 0 00.5.5h10a.5.5 0 00.5-.5v-10zM5 4a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V5a1 1 0 00-1-1H5z" clip-rule="evenodd" />
+                        <path d="M8 6a1 1 0 100 2 1 1 0 000-2zM6 10a1 1 0 112 0 1 1 0 01-2 0zm4 0a1 1 0 112 0 1 1 0 01-2 0zm2 4a1 1 0 100-2 1 1 0 000 2zm-4-4a1 1 0 112 0 1 1 0 01-2 0z" />
+                    </svg>
                 </button>
             </div>
             <button id="generate-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">
@@ -220,10 +223,15 @@
         <div id="edit-section" class="hidden w-full mb-6">
             <div class="relative flex flex-col sm:flex-row gap-2">
                 <input type="text" id="edit-prompt-input" class="w-full pl-3 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
-                <button id="edit-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-lg whitespace-nowrap flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
-                    <span>Editar Área</span>
-                </button>
+                <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">Editar</button>
+                <div class="flex items-center gap-1 p-1 border border-indigo-500/50 rounded-lg bg-gray-800/30">
+                    <button id="tool-pencil" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Dibujo libre">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button id="tool-rect" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección rectangular">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm1 1v10h10V4H4z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -253,8 +261,14 @@
             </div>
         </div>
 
+        <!-- Save Actions Section -->
+        <div id="save-actions" class="hidden w-full flex justify-end gap-2 mb-4">
+            <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600">Guardar</button>
+            <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-indigo-500 text-white hover:bg-indigo-600">Guardar Álbum</button>
+        </div>
+
         <!-- Result section with Carousel -->
-        <div id="result-container" class="result-container relative w-full border rounded-lg p-2 mt-6 min-h-[300px] flex items-center justify-center shadow-inner">
+        <div id="result-container" class="result-container relative w-full border rounded-lg p-2 min-h-[300px] flex items-center justify-center shadow-inner">
              <button id="prev-btn" class="carousel-btn hidden absolute left-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
             <div id="carousel" class="carousel w-full h-full">
                 <canvas id="mask-canvas" class="hidden"></canvas>
@@ -275,10 +289,6 @@
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
             <div id="error-message" class="hidden text-red-400 absolute"></div>
-            <div id="save-actions" class="hidden absolute bottom-4 right-4 z-20 flex gap-2">
-                <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600">Guardar</button>
-                <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-indigo-500 text-white hover:bg-indigo-600">Guardar Álbum</button>
-            </div>
         </div>
 
     </div>
@@ -323,6 +333,11 @@
         const editSection = document.getElementById('edit-section');
         const editPromptInput = document.getElementById('edit-prompt-input');
         const editBtn = document.getElementById('edit-btn');
+        
+        // Drawing Tools
+        const toolPencil = document.getElementById('tool-pencil');
+        const toolRect = document.getElementById('tool-rect');
+
 
         // Inpaint Section
         const inpaintSection = document.getElementById('inpaint-section');
@@ -370,6 +385,9 @@
         let isMaskingActive = false;
         let isDrawing = false;
         let overlayImageData = null;
+
+        let drawingTool = 'pencil'; // 'pencil' or 'rect'
+        let startPos = { x: 0, y: 0 };
 
         // La API Key se gestiona de forma segura en el servidor.
 
@@ -607,25 +625,31 @@
             const imageData = { mimeType, data: base64Data };
             
             handleImageGeneration(prompt, [imageData]);
-        });
+        }); // Fin de editBtn listener
         
         rewriteBtn.addEventListener('click', async () => {
-            const currentPrompt = promptInput.value;
-            if (!currentPrompt) return;
+            const validImages = uploadedImagesData.filter(img => img !== null);
+            if (validImages.length === 0) {
+                return showError('Sube al menos una imagen para generar una idea.');
+            }
 
             geminiIcon.classList.add('gemini-icon-spin');
             rewriteBtn.disabled = true;
             try {
                 // Ahora llamamos a nuestro propio backend
                 const apiUrl = '/api/generate';
+                
+                const parts = [{ text: "Observa las siguientes imágenes. Genera un prompt creativo y descriptivo para combinarlas en una sola imagen. Devuelve únicamente el texto del prompt, sin explicaciones ni introducciones." }];
+                validImages.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }));
+
                 const payload = {
                     contents: [{
-                        parts: [{ text: `Reformula y mejora el siguiente prompt para un modelo de generación de imágenes. Sé creativo y descriptivo. Devuelve solo el prompt mejorado, sin texto adicional. Prompt original: "${currentPrompt}"` }]
+                        parts: parts
                     }]
                 };
                 const result = await callApiWithBackoff(apiUrl, payload);
                 const newPrompt = result.candidates[0].content.parts[0].text.trim();
-                promptInput.value = newPrompt;
+                promptInput.value = newPrompt.replace(/\"/g, ''); // Limpia comillas
             } catch (error) {
                 console.error('Error reescribiendo el prompt:', error);
                 showError('No se pudo mejorar el prompt.');
@@ -694,7 +718,7 @@
             floatingImageContainer.removeAttribute('data-scale');
         });
 
-        function activateMasking() {
+        function activateMasking(tool) {
             isMaskingActive = true;
             maskCanvas.classList.remove('hidden');
             inpaintSection.classList.remove('hidden');
@@ -706,6 +730,11 @@
                 maskCanvas.height = currentImageElement.clientHeight;
                 maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
             }
+            
+            drawingTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
+            const activeToolBtn = document.getElementById(`tool-${tool}`);
+            if(activeToolBtn) activeToolBtn.classList.add('bg-indigo-500');
         }
 
         function deactivateMasking() {
@@ -717,6 +746,7 @@
                 editSection.classList.remove('hidden');
                 overlaySection.classList.remove('hidden');
             }
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
         }
 
         // --- Carousel Logic ---
@@ -820,21 +850,41 @@
             e.preventDefault();
             const pos = getMousePos(maskCanvas, e);
             maskCtx.lineTo(pos.x, pos.y);
-            maskCtx.stroke();
+            if (drawingTool === 'pencil') {
+                maskCtx.stroke();
+            } else if (drawingTool === 'rect') {
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                maskCtx.strokeRect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y);
+            }
         }
 
         maskCanvas.addEventListener('mousedown', (e) => {
             if (!isMaskingActive) return;
             isDrawing = true;
             const pos = getMousePos(maskCanvas, e);
+            startPos = pos;
+
             maskCtx.beginPath();
             maskCtx.moveTo(pos.x, pos.y);
             maskCtx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
             maskCtx.lineWidth = 20;
             maskCtx.lineCap = 'round';
             maskCtx.lineJoin = 'round';
+
+            if (drawingTool === 'rect') {
+                maskCtx.lineWidth = 2; // Thinner line for rectangle preview
+            }
         });
-        maskCanvas.addEventListener('mouseup', () => { isDrawing = false; });
+        maskCanvas.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            if (drawingTool === 'rect') {
+                const endPos = getMousePos(maskCanvas, e);
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                maskCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Fill the final rectangle
+                maskCtx.fillRect(startPos.x, startPos.y, endPos.x - startPos.x, endPos.y - startPos.y);
+            }
+        });
         maskCanvas.addEventListener('mouseout', () => { isDrawing = false; });
         maskCanvas.addEventListener('mousemove', drawOnMask);
 
@@ -866,8 +916,9 @@
             errorMessage.classList.add('hidden');
         }
 
-        // Add listener for masking
-        editBtn.addEventListener('click', activateMasking);
+        // Add listeners for drawing tools
+        toolPencil.addEventListener('click', () => activateMasking('pencil'));
+        toolRect.addEventListener('click', () => activateMasking('rect'));
 
         // --- Interact.js for Floating Image ---
         function updateTransform(target) {
