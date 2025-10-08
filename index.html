@@ -1226,13 +1226,11 @@
         });
 
         implementTextBtn.addEventListener('click', () => {
-            const prompt = editPromptInput.value.trim();
-            if (!prompt) {
-                showError('Describe cómo quieres integrar el texto en la imagen en el campo de edición.');
-                editPromptInput.focus();
-                return;
-            }
-            implementTextOverlay(prompt);
+            // Open the prompt modal to ask the user for instructions
+            showDrawingPromptPopup(async (prompt) => {
+                await implementTextOverlay(prompt);
+                drawingPromptModal.classList.add('hidden');
+            });
         });
 
         async function implementTextOverlay(prompt) {
