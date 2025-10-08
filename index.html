@@ -121,6 +121,80 @@
             width: 100%;
             height: 100%;
             cursor: crosshair;
+            pointer-events: none;
+        }
+
+        #drawing-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            z-index: 5;
+        }
+
+        .drawing-area {
+            position: absolute;
+            border: 3px dashed #6366f1;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+            cursor: move;
+            min-width: 40px;
+            min-height: 40px;
+            backdrop-filter: blur(2px);
+        }
+
+        .drawing-area:hover {
+            border-color: #818cf8;
+            background: rgba(129, 140, 248, 0.15);
+        }
+
+        .drawing-area-controls {
+            position: absolute;
+            top: -35px;
+            right: 0;
+            background: rgba(17, 24, 39, 0.9);
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .drawing-area:hover .drawing-area-controls {
+            opacity: 1;
+        }
+
+        .drawing-area-btn {
+            padding: 4px 8px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .drawing-area-btn:hover {
+            background: #818cf8;
+        }
+
+        .drawing-prompt-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(17, 24, 39, 0.95);
+            border: 2px solid #6366f1;
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 1000;
+            max-width: 400px;
+            width: 90%;
+            backdrop-filter: blur(10px);
         }
 
         #floating-image-container {
@@ -275,6 +349,7 @@
              <button id="prev-btn" class="carousel-btn hidden absolute left-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
             <div id="carousel" class="carousel w-full h-full">
                 <canvas id="mask-canvas" class="hidden"></canvas>
+                <div id="drawing-overlay" class="hidden"></div>
                 <div id="carousel-track" class="carousel-track h-full">
                     <div id="placeholder-slide" class="carousel-slide">
                          <div id="placeholder" class="text-gray-500">
@@ -313,6 +388,21 @@
             <canvas id="camera-canvas" class="hidden"></canvas>
             <button id="capture-btn" class="styled-button btn-primary w-full py-2 px-4 rounded-lg mb-2">Capturar</button>
             <button id="close-camera-modal-btn" class="text-gray-400 hover:text-white">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Drawing Area Prompt Modal -->
+    <div id="drawing-prompt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-indigo-500">
+            <h3 class="text-lg font-semibold mb-4 text-center text-white">¿Qué cambio quieres hacer?</h3>
+            <textarea id="drawing-prompt-textarea" 
+                     class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white resize-none focus:border-indigo-400 focus:outline-none" 
+                     rows="3" 
+                     placeholder="Describe el cambio que quieres aplicar en esta zona específica..."></textarea>
+            <div class="flex gap-3 mt-4">
+                <button id="drawing-prompt-cancel" class="flex-1 btn-secondary styled-button px-4 py-2 rounded-lg">Cancelar</button>
+                <button id="drawing-prompt-apply" class="flex-1 btn-primary styled-button px-4 py-2 rounded-lg">Aplicar Cambio</button>
+            </div>
         </div>
     </div>
 
@@ -367,6 +457,7 @@
         // Modal Elements
         const sourceModal = document.getElementById('source-modal');
         const cameraModal = document.getElementById('camera-modal');
+        const drawingPromptModal = document.getElementById('drawing-prompt-modal');
         const fromCameraBtn = document.getElementById('from-camera-btn');
         const fromFileBtn = document.getElementById('from-file-btn');
         const closeSourceModalBtn = document.getElementById('close-source-modal-btn');
@@ -376,6 +467,12 @@
         const canvas = document.getElementById('camera-canvas');
         const maskCanvas = document.getElementById('mask-canvas');
         const maskCtx = maskCanvas.getContext('2d');
+        
+        // Drawing overlay elements
+        const drawingOverlay = document.getElementById('drawing-overlay');
+        let currentDrawingArea = null;
+        let drawingAreas = [];
+        let isDrawingMode = false;
 
 
 
@@ -781,10 +878,15 @@
             // Show/hide save buttons and edit section
             const hasImages = generatedImagesHistory.length > 0;
             saveActions.classList.toggle('hidden', !hasImages);
-            editSection.classList.toggle('hidden', !hasImages);
-            overlaySection.classList.toggle('hidden', !hasImages);
+            editSection.classList.toggle('hidden', !hasImages && !isDrawingMode);
+            overlaySection.classList.toggle('hidden', !hasImages && !isDrawingMode);
             saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2);
-            deactivateMasking(); // Deactivate mask when changing image
+            
+            // Deactivate mask and drawing mode when changing image
+            deactivateMasking();
+            if (isDrawingMode) {
+                deactivateDrawingMode();
+            }
         }
 
         saveAlbumBtn.addEventListener('click', async () => {
@@ -935,9 +1037,271 @@
         }
 
         // Add listeners for drawing tools
-        toolPencil.addEventListener('click', () => activateMasking('pencil'));
+        toolPencil.addEventListener('click', () => activateDrawingMode());
         toolRect.addEventListener('click', () => activateMasking('rect'));
         toolCircle.addEventListener('click', () => activateMasking('circle'));
+
+        // Drawing mode functions
+        function activateDrawingMode() {
+            if (generatedImagesHistory.length === 0) {
+                showError('Primero genera una imagen para poder dibujar sobre ella.');
+                return;
+            }
+            
+            isDrawingMode = true;
+            drawingOverlay.classList.remove('hidden');
+            editSection.classList.add('hidden');
+            overlaySection.classList.add('hidden');
+            
+            // Show helper message
+            showError('Modo dibujo activado: Arrastra sobre la imagen para seleccionar un área. Presiona ESC para salir.');
+            setTimeout(() => hideError(), 4000);
+            
+            // Highlight the pencil tool
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
+            toolPencil.classList.add('bg-indigo-500');
+            
+            // Set cursor for the result container
+            resultContainer.style.cursor = 'crosshair';
+            
+            // Clear any existing drawing areas
+            drawingAreas.forEach(area => area.remove());
+            drawingAreas = [];
+        }
+
+        function deactivateDrawingMode() {
+            isDrawingMode = false;
+            isDrawing = false;
+            drawingOverlay.classList.add('hidden');
+            editSection.classList.remove('hidden');
+            overlaySection.classList.remove('hidden');
+            toolPencil.classList.remove('bg-indigo-500');
+            resultContainer.style.cursor = 'default';
+            
+            if (currentDrawingArea) {
+                currentDrawingArea.remove();
+                currentDrawingArea = null;
+            }
+        }
+
+        function createDrawingArea(startX, startY, endX, endY) {
+            const area = document.createElement('div');
+            area.className = 'drawing-area';
+            
+            const left = Math.min(startX, endX);
+            const top = Math.min(startY, endY);
+            const width = Math.abs(endX - startX);
+            const height = Math.abs(endY - startY);
+            
+            area.style.left = left + 'px';
+            area.style.top = top + 'px';
+            area.style.width = width + 'px';
+            area.style.height = height + 'px';
+            
+            // Add controls
+            area.innerHTML = `
+                <div class="drawing-area-controls">
+                    <button class="drawing-area-btn apply-btn">Aplicar</button>
+                    <button class="drawing-area-btn remove-btn">Eliminar</button>
+                </div>
+            `;
+            
+            // Add event listeners
+            const applyBtn = area.querySelector('.apply-btn');
+            const removeBtn = area.querySelector('.remove-btn');
+            
+            applyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showDrawingPromptPopup(area);
+            });
+            
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                area.remove();
+                drawingAreas = drawingAreas.filter(a => a !== area);
+            });
+            
+            // Make draggable
+            let isDragging = false;
+            let dragStartX, dragStartY;
+            
+            area.addEventListener('mousedown', (e) => {
+                if (e.target === area) {
+                    isDragging = true;
+                    dragStartX = e.clientX - area.offsetLeft;
+                    dragStartY = e.clientY - area.offsetTop;
+                    area.style.cursor = 'grabbing';
+                }
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const rect = drawingOverlay.getBoundingClientRect();
+                    const newLeft = Math.max(0, Math.min(e.clientX - rect.left - dragStartX, rect.width - area.offsetWidth));
+                    const newTop = Math.max(0, Math.min(e.clientY - rect.top - dragStartY, rect.height - area.offsetHeight));
+                    area.style.left = newLeft + 'px';
+                    area.style.top = newTop + 'px';
+                }
+            });
+            
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    area.style.cursor = 'move';
+                }
+            });
+            
+            drawingOverlay.appendChild(area);
+            drawingAreas.push(area);
+            return area;
+        }
+
+        function showDrawingPromptPopup(area) {
+            const modal = document.getElementById('drawing-prompt-modal');
+            const textarea = document.getElementById('drawing-prompt-textarea');
+            const cancelBtn = document.getElementById('drawing-prompt-cancel');
+            const applyBtn = document.getElementById('drawing-prompt-apply');
+            
+            // Clear previous content
+            textarea.value = '';
+            
+            // Show modal
+            modal.classList.remove('hidden');
+            textarea.focus();
+            
+            // Remove previous event listeners
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            const newApplyBtn = applyBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+            applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+            
+            // Add new event listeners
+            newCancelBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+            
+            newApplyBtn.addEventListener('click', async () => {
+                const prompt = textarea.value.trim();
+                if (!prompt) {
+                    showError('Por favor describe el cambio que quieres hacer.');
+                    return;
+                }
+                
+                modal.classList.add('hidden');
+                await applyDrawingAreaChange(area, prompt);
+            });
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        }
+
+        async function applyDrawingAreaChange(area, prompt) {
+            // Create mask from the drawing area
+            const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
+            const imgRect = currentImageElement.getBoundingClientRect();
+            const overlayRect = drawingOverlay.getBoundingClientRect();
+            
+            // Calculate relative position and size
+            const scaleX = currentImageElement.naturalWidth / imgRect.width;
+            const scaleY = currentImageElement.naturalHeight / imgRect.height;
+            
+            const areaLeft = (area.offsetLeft / overlayRect.width) * imgRect.width * scaleX;
+            const areaTop = (area.offsetTop / overlayRect.height) * imgRect.height * scaleY;
+            const areaWidth = (area.offsetWidth / overlayRect.width) * imgRect.width * scaleX;
+            const areaHeight = (area.offsetHeight / overlayRect.height) * imgRect.height * scaleY;
+            
+            // Create mask canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = currentImageElement.naturalWidth;
+            tempCanvas.height = currentImageElement.naturalHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Fill the selected area with white (mask area)
+            tempCtx.fillStyle = 'white';
+            tempCtx.fillRect(areaLeft, areaTop, areaWidth, areaHeight);
+            
+            // Get mask data
+            const maskDataUrl = tempCanvas.toDataURL('image/png');
+            const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
+            const maskData = { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
+            
+            // Get current image
+            const currentImage = generatedImagesHistory[currentImageIndex];
+            const [header, base64Data] = currentImage.split(',');
+            const imageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
+            
+            // Apply the change
+            await handleImageGeneration(prompt, [imageData], { mask: maskData });
+            
+            // Remove the drawing area and deactivate drawing mode
+            area.remove();
+            drawingAreas = drawingAreas.filter(a => a !== area);
+            deactivateDrawingMode();
+        }
+
+        // Drawing overlay event listeners
+        let drawStartX, drawStartY;
+        
+        drawingOverlay.addEventListener('mousedown', (e) => {
+            if (!isDrawingMode || e.target !== drawingOverlay) return;
+            
+            isDrawing = true;
+            const rect = drawingOverlay.getBoundingClientRect();
+            drawStartX = e.clientX - rect.left;
+            drawStartY = e.clientY - rect.top;
+            
+            // Remove any existing temporary drawing area
+            if (currentDrawingArea) {
+                currentDrawingArea.remove();
+            }
+            
+            currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
+        });
+        
+        drawingOverlay.addEventListener('mousemove', (e) => {
+            if (!isDrawing || !currentDrawingArea) return;
+            
+            const rect = drawingOverlay.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            // Update the drawing area size
+            const left = Math.min(drawStartX, currentX);
+            const top = Math.min(drawStartY, currentY);
+            const width = Math.abs(currentX - drawStartX);
+            const height = Math.abs(currentY - drawStartY);
+            
+            currentDrawingArea.style.left = left + 'px';
+            currentDrawingArea.style.top = top + 'px';
+            currentDrawingArea.style.width = width + 'px';
+            currentDrawingArea.style.height = height + 'px';
+        });
+        
+        drawingOverlay.addEventListener('mouseup', () => {
+            if (!isDrawing) return;
+            
+            isDrawing = false;
+            
+            // Check if the drawn area is too small
+            if (currentDrawingArea && (currentDrawingArea.offsetWidth < 20 || currentDrawingArea.offsetHeight < 20)) {
+                currentDrawingArea.remove();
+                currentDrawingArea = null;
+                return;
+            }
+            
+            currentDrawingArea = null;
+        });
+
+        // Add escape key to exit drawing mode
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isDrawingMode) {
+                deactivateDrawingMode();
+            }
+        });
 
         // --- Interact.js for Floating Image ---
         function updateTransform(target) {
