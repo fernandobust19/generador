@@ -120,7 +120,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5); /* Fondo oscuro semitransparente para visualización */
+            background-color: rgba(255, 0, 0, 0.2); /* Fondo rojo semitransparente para visualización */
             cursor: crosshair;
             pointer-events: auto;
             z-index: 5;
@@ -905,19 +905,8 @@
         });
         async function applyDrawingChange(prompt) {
             let maskData;
-            
-            // Preparamos la máscara para la API justo antes de enviarla.
-            // 1. Guardamos el dibujo actual (trazos blancos sobre fondo transparente).
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = maskCanvas.width;
-            tempCanvas.height = maskCanvas.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(maskCanvas, 0, 0);
-            // 2. Rellenamos el lienzo original de negro y luego dibujamos los trazos encima.
-            maskCtx.globalCompositeOperation = 'destination-over';
-            maskCtx.fillStyle = 'black';
-            maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-            const maskDataUrl = maskCanvas.toDataURL('image/png'); // Ahora la máscara es correcta (trazos blancos, fondo negro)
+
+            const maskDataUrl = maskCanvas.toDataURL('image/png');
             const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
             maskData = { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
             
@@ -949,21 +938,9 @@
             maskCanvas.style.top = (rect.top - containerRect.top) + 'px';
             maskCanvas.classList.remove('hidden');
 
-            // Limpiar y preparar el lienzo de la máscara
-            // Limpiamos el lienzo para que sea transparente y se vea la imagen de fondo
-            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height); 
-            // El fondo real de la máscara (que se envía a la API) se rellena de negro justo antes de enviar.
-            /* maskCtx.fillStyle = 'black'; // El fondo debe ser negro para la máscara
-            maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-
+            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
             maskCtx.strokeStyle = 'white';
-            maskCtx.lineWidth = 15; // Pincel más fino para mayor precisión
-            maskCtx.lineCap = 'round';
-            maskCtx.lineJoin = 'round';
-        }
-            */
-            maskCtx.strokeStyle = 'white';
-            maskCtx.lineWidth = 15; // Pincel más fino para mayor precisión
+            maskCtx.lineWidth = 30; // Adjust brush size
             maskCtx.lineCap = 'round';
             maskCtx.lineJoin = 'round';
         }
