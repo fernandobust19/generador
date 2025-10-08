@@ -172,6 +172,19 @@
             right: -10px;
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>') 16 16, auto;
         }
+        #text-overlay-container {
+            position: absolute;
+            touch-action: none;
+            user-select: none;
+            box-sizing: border-box;
+            padding: 10px;
+            cursor: move;
+            border: 2px dashed rgba(59, 130, 246, 0.7);
+        }
+        #text-overlay-content {
+            font-size: 24px; /* Base font size, will be scaled */
+            font-weight: bold;
+        }
         /* Carousel Styles */
         .carousel {
             overflow-x: scroll;
@@ -268,6 +281,9 @@
                 <button id="tool-pencil" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Dibujo libre">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                 </button>
+                <button id="add-text-btn" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Añadir Texto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 11-2 0V8H6v8a1 1 0 11-2 0V4zm5 4a1 1 0 100-2H7a1 1 0 100 2h2z" clip-rule="evenodd" /></svg>
+                </button>
             </div>
             <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600">Guardar</button>
             <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-indigo-500 text-white hover:bg-indigo-600">Guardar Álbum</button>
@@ -291,6 +307,11 @@
                 <img id="floating-image" src="" alt="Imagen flotante">
                 <div id="resize-handle" class="interaction-handle"></div>
                 <div id="rotate-handle" class="interaction-handle"></div>
+            </div>
+            <div id="text-overlay-container" class="hidden">
+                <div id="text-overlay-content"></div>
+                <div id="text-resize-handle" class="interaction-handle" style="bottom: -10px; right: -10px; cursor: se-resize;"></div>
+                <div id="text-rotate-handle" class="interaction-handle" style="top: -10px; right: -10px; cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>') 16 16, auto;"></div>
             </div>
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
@@ -333,6 +354,34 @@
             </div>
         </div>
     </div>
+    
+    <!-- Text Input Modal -->
+    <div id="text-prompt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-indigo-500">
+            <h3 class="text-lg font-semibold mb-4 text-center text-white">Añadir Texto a la Imagen</h3>
+            <input type="text" id="text-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-indigo-400 focus:outline-none" placeholder="Escribe tu texto aquí...">
+            <div class="flex justify-between items-center mt-4">
+                <div>
+                    <label for="text-color-input" class="text-sm text-gray-400 mr-2">Color:</label>
+                    <input type="color" id="text-color-input" value="#FFFFFF" class="bg-gray-700 rounded">
+                </div>
+                <div>
+                    <label for="text-font-select" class="text-sm text-gray-400 mr-2">Fuente:</label>
+                    <select id="text-font-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-1.5">
+                        <option value="'Inter', sans-serif">Inter</option>
+                        <option value="'Arial', sans-serif">Arial</option>
+                        <option value="'Courier New', monospace">Courier</option>
+                        <option value="'Georgia', serif">Georgia</option>
+                        <option value="'Brush Script MT', cursive">Cursive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button id="text-prompt-cancel" class="flex-1 btn-secondary styled-button px-4 py-2 rounded-lg">Cancelar</button>
+                <button id="text-prompt-apply" class="flex-1 btn-primary styled-button px-4 py-2 rounded-lg">Añadir Texto</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // --- DOM Elements ---
@@ -358,6 +407,7 @@
         
         // Drawing Tools
         const toolPencil = document.getElementById('tool-pencil');
+        const addTextBtn = document.getElementById('add-text-btn');
         
         // Overlay Section
         const overlaySection = document.getElementById('overlay-section');
@@ -367,6 +417,11 @@
         const implementOverlayBtn = document.getElementById('implement-overlay-btn');
         const floatingImageContainer = document.getElementById('floating-image-container');
         const floatingImage = document.getElementById('floating-image');
+
+        // Text Overlay Elements
+        const textOverlayContainer = document.getElementById('text-overlay-container');
+        const textOverlayContent = document.getElementById('text-overlay-content');
+        const textPromptModal = document.getElementById('text-prompt-modal');
 
         // Carousel Elements
         const carousel = document.getElementById('carousel');
@@ -940,7 +995,7 @@
 
             maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
             maskCtx.strokeStyle = 'white';
-            maskCtx.lineWidth = 30; // Adjust brush size
+            maskCtx.lineWidth = 15; // Adjust brush size
             maskCtx.lineCap = 'round';
             maskCtx.lineJoin = 'round';
         }
@@ -1011,6 +1066,63 @@
             }
         });
 
+        // --- Text Overlay Logic ---
+        addTextBtn.addEventListener('click', () => {
+            if (generatedImagesHistory.length === 0) {
+                showError('Primero genera una imagen para poder añadir texto.');
+                return;
+            }
+            textPromptModal.classList.remove('hidden');
+            document.getElementById('text-input').focus();
+        });
+
+        document.getElementById('text-prompt-cancel').addEventListener('click', () => {
+            textPromptModal.classList.add('hidden');
+        });
+
+        document.getElementById('text-prompt-apply').addEventListener('click', () => {
+            const text = document.getElementById('text-input').value;
+            const color = document.getElementById('text-color-input').value;
+            const font = document.getElementById('text-font-select').value;
+
+            if (!text.trim()) {
+                showError("El texto no puede estar vacío.");
+                return;
+            }
+
+            textOverlayContent.innerText = text;
+            textOverlayContent.style.color = color;
+            textOverlayContent.style.fontFamily = font;
+
+            // Reset position and transforms
+            textOverlayContainer.style.transform = '';
+            textOverlayContainer.style.width = '';
+            textOverlayContainer.style.height = '';
+            textOverlayContainer.removeAttribute('data-x');
+            textOverlayContainer.removeAttribute('data-y');
+            textOverlayContainer.removeAttribute('data-rotate');
+            
+            textOverlayContainer.classList.remove('hidden');
+            
+            // Center the new text
+            const parentRect = resultContainer.getBoundingClientRect();
+            const textRect = textOverlayContainer.getBoundingClientRect();
+            const initialX = (parentRect.width - textRect.width) / 2;
+            const initialY = (parentRect.height - textRect.height) / 2;
+            textOverlayContainer.style.transform = `translate(${initialX}px, ${initialY}px)`;
+            textOverlayContainer.setAttribute('data-x', initialX);
+            textOverlayContainer.setAttribute('data-y', initialY);
+
+            textPromptModal.classList.add('hidden');
+            document.getElementById('text-input').value = '';
+
+            // Create a button to implement the text
+            const implementTextBtn = document.createElement('button');
+            implementTextBtn.id = 'implement-text-btn';
+            implementTextBtn.className = 'styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap';
+            implementTextBtn.innerText = 'Implementar Texto';
+        });
+
         // --- Interact.js for Floating Image ---
         function updateTransform(target) {
             const x = parseFloat(target.getAttribute('data-x')) || 0;
@@ -1054,6 +1166,43 @@
                 const currentAngle = (parseFloat(target.getAttribute('data-rotate')) || 0) * (Math.PI / 180);
                 const newAngleDeg = (angle * (180 / Math.PI)) + 90; // Adjust for initial handle position
                 
+                target.setAttribute('data-rotate', newAngleDeg);
+                updateTransform(target);
+            }
+        });
+
+        // --- Interact.js for Text Overlay ---
+        interact(textOverlayContainer).draggable({
+            listeners: {
+                move(event) {
+                    const target = event.target;
+                    const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                    const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                    target.setAttribute('data-x', x);
+                    target.setAttribute('data-y', y);
+                    updateTransform(target);
+                }
+            },
+            inertia: true,
+            modifiers: [interact.modifiers.restrictRect({ restriction: 'parent', endOnly: true })]
+        });
+
+        interact('#text-resize-handle').draggable({
+            onmove: function (event) {
+                const target = textOverlayContainer;
+                const rect = target.getBoundingClientRect();
+                target.style.width = rect.width + event.dx + 'px';
+                target.style.height = rect.height + event.dy + 'px';
+            },
+        });
+
+        interact('#text-rotate-handle').draggable({
+            onmove: function (event) {
+                const target = textOverlayContainer;
+                const rect = target.getBoundingClientRect();
+                const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                const angle = Math.atan2(event.clientY - center.y, event.clientX - center.x);
+                const newAngleDeg = (angle * (180 / Math.PI)) + 90;
                 target.setAttribute('data-rotate', newAngleDeg);
                 updateTransform(target);
             }
