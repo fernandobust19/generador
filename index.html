@@ -356,7 +356,6 @@
         const editBtn = document.getElementById('edit-btn');
         const inpaintCancelBtn = document.getElementById('inpaint-cancel-btn');
         
-        // Text implementation button (will be created dynamically)
         // Drawing Tools
         const toolPencil = document.getElementById('tool-pencil');
         
@@ -941,7 +940,7 @@
 
             maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
             maskCtx.strokeStyle = 'white';
-            maskCtx.lineWidth = 15; // Adjust brush size
+            maskCtx.lineWidth = 30; // Adjust brush size
             maskCtx.lineCap = 'round';
             maskCtx.lineJoin = 'round';
         }
