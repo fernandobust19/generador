@@ -636,7 +636,6 @@
 
         async function handleImageGeneration(prompt, images, { mask = null, overlay = null } = {}) {
             setLoadingState(true);
-            deactivateMasking();
             try {
                 // Ahora llamamos a nuestro propio backend
                 const apiUrl = '/api/generate';
