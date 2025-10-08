@@ -146,31 +146,80 @@
             touch-action: none; /* Required for interact.js */
             user-select: none;
             box-sizing: border-box;
-            border: 2px solid rgba(99, 102, 241, 0.7); /* Dashed border to show it's an element */
+            border: 2px dashed rgba(99, 102, 241, 0.8);
+            border-radius: 4px;
+            min-width: 50px;
+            min-height: 50px;
+            max-width: 90%;
+            max-height: 90%;
+            cursor: move;
+            transition: border-color 0.2s ease;
+        }
+        #floating-image-container:hover {
+            border-color: rgba(99, 102, 241, 1);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+        }
+        #floating-image-container.active {
+            border-color: rgba(34, 197, 94, 0.8);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
         }
         #floating-image-container img {
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Make sure clicks go through the image to the container for dragging */
+            object-fit: contain;
+            pointer-events: none;
+            border-radius: 2px;
         }
         .interaction-handle {
             position: absolute;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             background-color: #6366f1;
-            border: 2px solid white;
+            border: 3px solid white;
             border-radius: 50%;
-            z-index: 10;
+            z-index: 15;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        .interaction-handle:hover {
+            background-color: #4f46e5;
+            transform: scale(1.1);
         }
         #resize-handle {
-            bottom: -10px;
-            right: -10px;
+            bottom: -12px;
+            right: -12px;
             cursor: se-resize;
         }
         #rotate-handle {
-            top: -10px;
-            right: -10px;
+            top: -12px;
+            right: -12px;
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>') 16 16, auto;
+        }
+        /* Scale handle for mobile */
+        #scale-handle {
+            bottom: -12px;
+            left: -12px;
+            cursor: nw-resize;
+            background-color: #10b981;
+        }
+        /* Mobile touch improvements */
+        @media (max-width: 768px) {
+            .interaction-handle {
+                width: 32px;
+                height: 32px;
+            }
+            #resize-handle, #rotate-handle, #scale-handle {
+                bottom: -16px;
+                right: -16px;
+            }
+            #scale-handle {
+                bottom: -16px;
+                left: -16px;
+            }
+            #rotate-handle {
+                top: -16px;
+                right: -16px;
+            }
         }
         /* Carousel Styles */
         .carousel {
@@ -292,8 +341,9 @@
             </div>
             <div id="floating-image-container" class="hidden">
                 <img id="floating-image" src="" alt="Imagen flotante">
-                <div id="resize-handle" class="interaction-handle"></div>
-                <div id="rotate-handle" class="interaction-handle"></div>
+                <div id="resize-handle" class="interaction-handle" title="Redimensionar"></div>
+                <div id="rotate-handle" class="interaction-handle" title="Rotar"></div>
+                <div id="scale-handle" class="interaction-handle" title="Escalar"></div>
             </div>
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
@@ -524,25 +574,38 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    // Reset previous transformations before showing the new image
+                    // Resetear todas las transformaciones
                     floatingImageContainer.style.transform = '';
-                    floatingImageContainer.style.width = '150px'; // Set initial small size
-                    floatingImageContainer.style.height = ''; // Let height be auto
                     floatingImageContainer.removeAttribute('data-x');
-                    floatingImageContainer.removeAttribute('data-y');
+                    floatingImageContainer.removeAttribute('data-y'); 
                     floatingImageContainer.removeAttribute('data-rotate');
                     floatingImageContainer.removeAttribute('data-scale');
-
+                    
+                    // Configurar tamaño inicial optimizado para móviles
+                    const isMobile = window.innerWidth <= 768;
+                    const initialSize = isMobile ? 120 : 150;
+                    floatingImageContainer.style.width = initialSize + 'px';
+                    floatingImageContainer.style.height = initialSize + 'px';
+                    
                     floatingImage.src = e.target.result;
                     floatingImageContainer.classList.remove('hidden');
 
-                    // Center the new small image
-                    const parentRect = resultContainer.getBoundingClientRect();
-                    const initialX = (parentRect.width - 150) / 2;
-                    const initialY = (parentRect.height - 150) / 2; // Approximate height
-                    floatingImageContainer.style.transform = `translate(${initialX}px, ${initialY}px)`;
-                    floatingImageContainer.setAttribute('data-x', initialX);
-                    floatingImageContainer.setAttribute('data-y', initialY);
+                    // Posicionar en el centro con mejor cálculo
+                    setTimeout(() => {
+                        const parentRect = resultContainer.getBoundingClientRect();
+                        const containerRect = floatingImageContainer.getBoundingClientRect();
+                        const initialX = (parentRect.width - containerRect.width) / 2;
+                        const initialY = (parentRect.height - containerRect.height) / 2;
+                        
+                        floatingImageContainer.setAttribute('data-x', initialX);
+                        floatingImageContainer.setAttribute('data-y', initialY);
+                        floatingImageContainer.setAttribute('data-scale', 1);
+                        floatingImageContainer.setAttribute('data-rotate', 0);
+                        updateTransform(floatingImageContainer);
+                        
+                        // Mostrar mensaje de ayuda
+                        showFloatingImageHelp();
+                    }, 100);
 
                     const [header, base64Data] = e.target.result.split(',');
                     overlayImageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
@@ -1025,52 +1088,243 @@
             }
         });
 
-        // --- Interact.js for Floating Image ---
+        // --- Enhanced Floating Image Controls ---
+        let floatingImageState = {
+            x: 0,
+            y: 0,
+            rotation: 0,
+            scale: 1,
+            width: 150,
+            height: 150
+        };
+
+        // Variables para gestos táctiles
+        let touchStartDistance = 0;
+        let touchStartScale = 1;
+        let isGesturing = false;
+
         function updateTransform(target) {
             const x = parseFloat(target.getAttribute('data-x')) || 0;
             const y = parseFloat(target.getAttribute('data-y')) || 0;
             const angle = parseFloat(target.getAttribute('data-rotate')) || 0;
-            target.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+            const scale = parseFloat(target.getAttribute('data-scale')) || 1;
+            target.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg) scale(${scale})`;
         }
 
+        function updateFloatingImageSize(width, height) {
+            floatingImageContainer.style.width = Math.max(50, Math.min(width, window.innerWidth * 0.9)) + 'px';
+            floatingImageContainer.style.height = Math.max(50, Math.min(height, window.innerHeight * 0.9)) + 'px';
+        }
+
+        // Función para calcular distancia entre dos puntos táctiles
+        function getDistance(touch1, touch2) {
+            const dx = touch1.clientX - touch2.clientX;
+            const dy = touch1.clientY - touch2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Configurar interact.js para arrastrar
         interact(floatingImageContainer).draggable({
             listeners: {
+                start(event) {
+                    event.target.classList.add('active');
+                },
                 move(event) {
+                    if (isGesturing) return; // No mover si está haciendo gestos de pellizco
+                    
                     const target = event.target;
                     const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
                     const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
                     target.setAttribute('data-x', x);
                     target.setAttribute('data-y', y);
                     updateTransform(target);
+                },
+                end(event) {
+                    event.target.classList.remove('active');
                 }
             },
             inertia: true,
-            modifiers: [interact.modifiers.restrictRect({ restriction: 'parent', endOnly: true })]
+            modifiers: [
+                interact.modifiers.restrictRect({
+                    restriction: 'parent',
+                    endOnly: true
+                })
+            ]
         });
 
-        interact('#resize-handle').draggable({
-            onmove: function (event) {
-                const target = floatingImageContainer;
-                const rect = target.getBoundingClientRect();
+        // Manejar gestos táctiles (pellizco para escalar)
+        floatingImageContainer.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                isGesturing = true;
+                touchStartDistance = getDistance(e.touches[0], e.touches[1]);
+                touchStartScale = parseFloat(this.getAttribute('data-scale')) || 1;
+                this.classList.add('active');
+            }
+        }, { passive: false });
+
+        floatingImageContainer.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && isGesturing) {
+                e.preventDefault();
+                const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                const scale = touchStartScale * (currentDistance / touchStartDistance);
                 
-                target.style.width = rect.width + event.dx + 'px';
-                target.style.height = rect.height + event.dy + 'px';
-            },
+                // Limitar el escalado entre 0.3 y 3
+                const clampedScale = Math.max(0.3, Math.min(3, scale));
+                this.setAttribute('data-scale', clampedScale);
+                updateTransform(this);
+            }
+        }, { passive: false });
+
+        floatingImageContainer.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2) {
+                isGesturing = false;
+                this.classList.remove('active');
+            }
         });
 
-        interact('#rotate-handle').draggable({
+        // Handle de redimensionado
+        interact('#resize-handle').draggable({
+            onstart: function(event) {
+                floatingImageContainer.classList.add('active');
+            },
             onmove: function (event) {
                 const target = floatingImageContainer;
                 const rect = target.getBoundingClientRect();
-                const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                const newWidth = rect.width + event.dx;
+                const newHeight = rect.height + event.dy;
+                updateFloatingImageSize(newWidth, newHeight);
+            },
+            onend: function(event) {
+                floatingImageContainer.classList.remove('active');
+            }
+        });
+
+        // Handle de escalado proporcional
+        interact('#scale-handle').draggable({
+            onstart: function(event) {
+                floatingImageContainer.classList.add('active');
+            },
+            onmove: function (event) {
+                const target = floatingImageContainer;
+                const rect = target.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                // Calcular escala basada en la distancia del centro
+                const currentScale = parseFloat(target.getAttribute('data-scale')) || 1;
+                const scaleDelta = (event.dx + event.dy) * 0.005;
+                const newScale = Math.max(0.3, Math.min(3, currentScale + scaleDelta));
+                
+                target.setAttribute('data-scale', newScale);
+                updateTransform(target);
+            },
+            onend: function(event) {
+                floatingImageContainer.classList.remove('active');
+            }
+        });
+
+        // Handle de rotación mejorado
+        interact('#rotate-handle').draggable({
+            onstart: function(event) {
+                floatingImageContainer.classList.add('active');
+            },
+            onmove: function (event) {
+                const target = floatingImageContainer;
+                const rect = target.getBoundingClientRect();
+                const center = { 
+                    x: rect.left + rect.width / 2, 
+                    y: rect.top + rect.height / 2 
+                };
                 
                 const angle = Math.atan2(event.clientY - center.y, event.clientX - center.x);
-                const currentAngle = (parseFloat(target.getAttribute('data-rotate')) || 0) * (Math.PI / 180);
-                const newAngleDeg = (angle * (180 / Math.PI)) + 90; // Adjust for initial handle position
+                const newAngleDeg = (angle * (180 / Math.PI)) + 90;
                 
                 target.setAttribute('data-rotate', newAngleDeg);
                 updateTransform(target);
+            },
+            onend: function(event) {
+                floatingImageContainer.classList.remove('active');
             }
+        });
+
+        // Doble tap para resetear transformaciones
+        let lastTap = 0;
+        floatingImageContainer.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0) {
+                // Doble tap detectado - resetear transformaciones
+                this.setAttribute('data-x', 0);
+                this.setAttribute('data-y', 0);
+                this.setAttribute('data-rotate', 0);
+                this.setAttribute('data-scale', 1);
+                updateTransform(this);
+                updateFloatingImageSize(150, 150);
+                
+                // Mostrar feedback visual
+                this.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.6)';
+                setTimeout(() => {
+                    this.style.boxShadow = '';
+                }, 500);
+            }
+            lastTap = currentTime;
+        });
+
+        // Función para mostrar ayuda sobre imagen flotante
+        function showFloatingImageHelp() {
+            const helpMessage = document.createElement('div');
+            helpMessage.id = 'floating-help';
+            helpMessage.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.9);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 1000;
+                max-width: 90%;
+                text-align: center;
+                border: 1px solid rgba(99, 102, 241, 0.5);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            
+            const isMobile = window.innerWidth <= 768;
+            helpMessage.innerHTML = isMobile ? 
+                `✨ <strong>Imagen flotante cargada</strong><br>
+                • Arrastra para mover<br>
+                • Pellizca para escalar<br>
+                • Usa los botones para rotar/redimensionar<br>
+                • Doble tap para resetear` :
+                `✨ <strong>Imagen flotante cargada</strong><br>
+                Arrastra para mover • Usa los controles para escalar/rotar • Doble clic para resetear`;
+            
+            document.body.appendChild(helpMessage);
+            
+            // Auto-ocultar después de 4 segundos
+            setTimeout(() => {
+                if (helpMessage.parentNode) {
+                    helpMessage.style.opacity = '0';
+                    helpMessage.style.transition = 'opacity 0.3s ease';
+                    setTimeout(() => helpMessage.remove(), 300);
+                }
+            }, 4000);
+        }
+
+        // Mejorar feedback visual en controles
+        document.querySelectorAll('.interaction-handle').forEach(handle => {
+            handle.addEventListener('mousedown', () => {
+                handle.style.transform = 'scale(1.2)';
+                handle.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.6)';
+            });
+            
+            handle.addEventListener('mouseup', () => {
+                handle.style.transform = '';
+                handle.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+            });
         });
     </script>
 </body>
