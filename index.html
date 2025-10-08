@@ -124,16 +124,6 @@
             pointer-events: none;
         }
 
-        #drawing-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: auto;
-            z-index: 5;
-        }
-
         .drawing-area {
             position: absolute;
             border: 3px dashed #6366f1;
@@ -349,7 +339,6 @@
              <button id="prev-btn" class="carousel-btn hidden absolute left-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
             <div id="carousel" class="carousel w-full h-full">
                 <canvas id="mask-canvas" class="hidden"></canvas>
-                <div id="drawing-overlay" class="hidden"></div>
                 <div id="carousel-track" class="carousel-track h-full">
                     <div id="placeholder-slide" class="carousel-slide">
                          <div id="placeholder" class="text-gray-500">
@@ -468,13 +457,6 @@
         const maskCanvas = document.getElementById('mask-canvas');
         const maskCtx = maskCanvas.getContext('2d');
         
-        // Drawing overlay elements
-        const drawingOverlay = document.getElementById('drawing-overlay');
-        let currentDrawingArea = null;
-        let drawingAreas = [];
-        let isDrawingMode = false;
-
-
 
         // --- State Variables ---
         const NUM_SLOTS = 3;
@@ -483,11 +465,14 @@
         let currentImageIndex = 0;
         let currentSlotIndex = null;
         let cameraStream = null;
-        let isMaskingActive = false;
         let isDrawing = false;
         let overlayImageData = null;
 
-        let drawingTool = 'pencil'; // 'pencil', 'rect', or 'circle'
+        // Unified Drawing/Inpainting State
+        let isDrawingMode = false;
+        let currentDrawingArea = null;
+        let drawingAreas = [];
+        let drawStartX, drawStartY;
         let startPos = { x: 0, y: 0 };
 
         // La API Key se gestiona de forma segura en el servidor.
@@ -819,37 +804,6 @@
             floatingImageContainer.removeAttribute('data-scale');
         });
 
-        function activateMasking(tool) {
-            isMaskingActive = true;
-            maskCanvas.classList.remove('hidden');
-            inpaintSection.classList.remove('hidden');
-            editSection.classList.add('hidden'); // Oculta la edición normal y la de superposición
-
-            const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
-            if (currentImageElement) {
-                maskCanvas.width = currentImageElement.clientWidth;
-                maskCanvas.height = currentImageElement.clientHeight;
-                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-            }
-            
-            drawingTool = tool;
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
-            const activeToolBtn = document.getElementById(`tool-${tool}`);
-            if(activeToolBtn) activeToolBtn.classList.add('bg-indigo-500');
-        }
-
-        function deactivateMasking() {
-            isMaskingActive = false;
-            isDrawing = false;
-            maskCanvas.classList.add('hidden');
-            inpaintSection.classList.add('hidden');
-            if (generatedImagesHistory.length > 0) {
-                editSection.classList.remove('hidden');
-                overlaySection.classList.remove('hidden');
-            }
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
-        }
-
         // --- Carousel Logic ---
         function addImageToCarousel(imageUrl) {
             generatedImagesHistory.push(imageUrl);
@@ -883,7 +837,7 @@
             saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2);
             
             // Deactivate mask and drawing mode when changing image
-            deactivateMasking();
+            // deactivateMasking(); // This system is removed
             if (isDrawingMode) {
                 deactivateDrawingMode();
             }
@@ -938,76 +892,6 @@
             if (touchendX > touchstartX + 50) prevBtn.click();
         });
 
-        // --- Mask Drawing Events ---
-        function getMousePos(canvas, evt) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const clientX = evt.clientX || evt.touches[0].clientX;
-            const clientY = evt.clientY || evt.touches[0].clientY;
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
-        }
-
-        function drawOnMask(e) {
-            if (!isDrawing) return;
-            e.preventDefault();
-            const pos = getMousePos(maskCanvas, e);
-            maskCtx.lineTo(pos.x, pos.y);
-            if (drawingTool === 'pencil') {
-                maskCtx.stroke();
-            } else if (drawingTool === 'rect') {
-                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-                maskCtx.strokeRect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y);
-            } else if (drawingTool === 'circle') {
-                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-                maskCtx.beginPath(); // Iniciar un nuevo trazado para el círculo
-                const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2));
-                maskCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
-                maskCtx.stroke(); // Dibujar el contorno del círculo
-            }
-        }
-
-        maskCanvas.addEventListener('mousedown', (e) => {
-            if (!isMaskingActive) return;
-            isDrawing = true;
-            const pos = getMousePos(maskCanvas, e);
-            startPos = pos;
-
-            maskCtx.beginPath();
-            maskCtx.moveTo(pos.x, pos.y);
-            maskCtx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-            maskCtx.lineWidth = 20;
-            maskCtx.lineCap = 'round';
-            maskCtx.lineJoin = 'round';
-
-            if (drawingTool === 'rect' || drawingTool === 'circle') {
-                maskCtx.lineWidth = 2; // Thinner line for rectangle preview
-            }
-        });
-        maskCanvas.addEventListener('mouseup', (e) => {
-            if (!isDrawing) return;
-            isDrawing = false;
-            if (drawingTool === 'rect') {
-                const endPos = getMousePos(maskCanvas, e);
-                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-                maskCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Fill the final rectangle
-                maskCtx.fillRect(startPos.x, startPos.y, endPos.x - startPos.x, endPos.y - startPos.y);
-            } else if (drawingTool === 'circle') {
-                const endPos = getMousePos(maskCanvas, e);
-                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-                const radius = Math.sqrt(Math.pow(endPos.x - startPos.x, 2) + Math.pow(endPos.y - startPos.y, 2));
-                maskCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; // Fill the final circle
-                maskCtx.beginPath();
-                maskCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
-                maskCtx.fill();
-            }
-        });
-        maskCanvas.addEventListener('mouseout', () => { isDrawing = false; });
-        maskCanvas.addEventListener('mousemove', drawOnMask);
-
         // --- UI Helper Functions ---
         saveBtn.addEventListener('click', () => {
             if (generatedImagesHistory.length > 0) {
@@ -1037,24 +921,24 @@
         }
 
         // Add listeners for drawing tools
-        toolPencil.addEventListener('click', () => activateDrawingMode());
-        toolRect.addEventListener('click', () => activateMasking('rect'));
-        toolCircle.addEventListener('click', () => activateMasking('circle'));
+        toolPencil.addEventListener('click', () => activateDrawingMode('tool-pencil'));
+        toolRect.addEventListener('click', () => activateDrawingMode('tool-rect'));
+        toolCircle.addEventListener('click', () => activateDrawingMode('tool-circle'));
 
         // Drawing mode functions
-        function activateDrawingMode() {
+        function activateDrawingMode(toolId) {
             if (generatedImagesHistory.length === 0) {
                 showError('Primero genera una imagen para poder dibujar sobre ella.');
                 return;
             }
             
             isDrawingMode = true;
-            drawingOverlay.classList.remove('hidden');
             editSection.classList.add('hidden');
             overlaySection.classList.add('hidden');
+            inpaintSection.classList.add('hidden'); // Hide old inpaint section
             
             // Show helper message
-            showError('Modo dibujo activado: Arrastra sobre la imagen para seleccionar un área. Presiona ESC para salir.');
+            showError('Modo Dibujo: Arrastra para crear una selección. Presiona ESC para salir.');
             setTimeout(() => hideError(), 4000);
             
             // Highlight the pencil tool
@@ -1062,8 +946,8 @@
             toolPencil.classList.add('bg-indigo-500');
             
             // Set cursor for the result container
-            resultContainer.style.cursor = 'crosshair';
-            
+            resultContainer.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>') 4 20, crosshair`;
+
             // Clear any existing drawing areas
             drawingAreas.forEach(area => area.remove());
             drawingAreas = [];
@@ -1072,10 +956,9 @@
         function deactivateDrawingMode() {
             isDrawingMode = false;
             isDrawing = false;
-            drawingOverlay.classList.add('hidden');
             editSection.classList.remove('hidden');
             overlaySection.classList.remove('hidden');
-            toolPencil.classList.remove('bg-indigo-500');
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
             resultContainer.style.cursor = 'default';
             
             if (currentDrawingArea) {
@@ -1136,9 +1019,9 @@
             
             document.addEventListener('mousemove', (e) => {
                 if (isDragging) {
-                    const rect = drawingOverlay.getBoundingClientRect();
-                    const newLeft = Math.max(0, Math.min(e.clientX - rect.left - dragStartX, rect.width - area.offsetWidth));
-                    const newTop = Math.max(0, Math.min(e.clientY - rect.top - dragStartY, rect.height - area.offsetHeight));
+                    const parentRect = resultContainer.getBoundingClientRect();
+                    const newLeft = Math.max(0, Math.min(e.clientX - parentRect.left - dragStartX, parentRect.width - area.offsetWidth));
+                    const newTop = Math.max(0, Math.min(e.clientY - parentRect.top - dragStartY, parentRect.height - area.offsetHeight));
                     area.style.left = newLeft + 'px';
                     area.style.top = newTop + 'px';
                 }
@@ -1151,7 +1034,7 @@
                 }
             });
             
-            drawingOverlay.appendChild(area);
+            resultContainer.appendChild(area);
             drawingAreas.push(area);
             return area;
         }
@@ -1202,17 +1085,16 @@
         async function applyDrawingAreaChange(area, prompt) {
             // Create mask from the drawing area
             const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
-            const imgRect = currentImageElement.getBoundingClientRect();
-            const overlayRect = drawingOverlay.getBoundingClientRect();
+            const resultRect = resultContainer.getBoundingClientRect();
             
             // Calculate relative position and size
-            const scaleX = currentImageElement.naturalWidth / imgRect.width;
-            const scaleY = currentImageElement.naturalHeight / imgRect.height;
+            const scaleX = currentImageElement.naturalWidth / currentImageElement.clientWidth;
+            const scaleY = currentImageElement.naturalHeight / currentImageElement.clientHeight;
             
-            const areaLeft = (area.offsetLeft / overlayRect.width) * imgRect.width * scaleX;
-            const areaTop = (area.offsetTop / overlayRect.height) * imgRect.height * scaleY;
-            const areaWidth = (area.offsetWidth / overlayRect.width) * imgRect.width * scaleX;
-            const areaHeight = (area.offsetHeight / overlayRect.height) * imgRect.height * scaleY;
+            const areaLeft = (area.offsetLeft - currentImageElement.offsetLeft) * scaleX;
+            const areaTop = (area.offsetTop - currentImageElement.offsetTop) * scaleY;
+            const areaWidth = area.offsetWidth * scaleX;
+            const areaHeight = area.offsetHeight * scaleY;
             
             // Create mask canvas
             const tempCanvas = document.createElement('canvas');
@@ -1244,16 +1126,14 @@
         }
 
         // Drawing overlay event listeners
-        let drawStartX, drawStartY;
-        
-        drawingOverlay.addEventListener('mousedown', (e) => {
-            if (!isDrawingMode || e.target !== drawingOverlay) return;
+        resultContainer.addEventListener('mousedown', (e) => {
+            if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn')) return;
             
             isDrawing = true;
-            const rect = drawingOverlay.getBoundingClientRect();
+            const rect = resultContainer.getBoundingClientRect();
             drawStartX = e.clientX - rect.left;
             drawStartY = e.clientY - rect.top;
-            
+
             // Remove any existing temporary drawing area
             if (currentDrawingArea) {
                 currentDrawingArea.remove();
@@ -1262,12 +1142,12 @@
             currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
         });
         
-        drawingOverlay.addEventListener('mousemove', (e) => {
+        document.addEventListener('mousemove', (e) => {
             if (!isDrawing || !currentDrawingArea) return;
             
-            const rect = drawingOverlay.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
+            const rect = resultContainer.getBoundingClientRect();
+            const currentX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const currentY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
             
             // Update the drawing area size
             const left = Math.min(drawStartX, currentX);
@@ -1281,7 +1161,7 @@
             currentDrawingArea.style.height = height + 'px';
         });
         
-        drawingOverlay.addEventListener('mouseup', () => {
+        document.addEventListener('mouseup', () => {
             if (!isDrawing) return;
             
             isDrawing = false;
