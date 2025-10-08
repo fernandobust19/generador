@@ -120,6 +120,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            background-color: rgba(255, 0, 0, 0.2); /* Fondo rojo semitransparente para visualización */
             cursor: crosshair;
             pointer-events: auto;
             z-index: 5;
@@ -296,17 +297,6 @@
             <div class="relative flex flex-col sm:flex-row gap-2">
                 <input type="text" id="edit-prompt-input" class="w-full pl-3 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
                 <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">Editar</button> <!-- For general edits -->
-                <div class="flex items-center gap-1 p-1 border border-indigo-500/50 rounded-lg bg-gray-800/30">
-                    <button id="tool-pencil" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Dibujo libre">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <button id="tool-rect" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección rectangular">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm1 1v10h10V4H4z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <button id="tool-circle" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección circular">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM2 10a8 8 0 1116 0 8 8 0 01-16 0z" clip-rule="evenodd" /></svg>
-                    </button>
-                </div>
                 <button id="inpaint-cancel-btn" class="hidden styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-700">Cancelar</button>
             </div>
         </div>
@@ -328,7 +318,18 @@
         </div>
 
         <!-- Save Actions Section -->
-        <div id="save-actions" class="hidden w-full flex justify-end gap-2 mb-4">
+        <div id="save-actions" class="hidden w-full flex justify-between items-center gap-2 mb-4">
+            <div class="flex items-center gap-1 p-1 border border-indigo-500/50 rounded-lg bg-gray-800/30">
+                <button id="tool-pencil" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Dibujo libre">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                </button>
+                <button id="tool-rect" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección rectangular">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm1 1v10h10V4H4z" clip-rule="evenodd" /></svg>
+                </button>
+                <button id="tool-circle" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Selección circular">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM2 10a8 8 0 1116 0 8 8 0 01-16 0z" clip-rule="evenodd" /></svg>
+                </button>
+            </div>
             <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600">Guardar</button>
             <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-indigo-500 text-white hover:bg-indigo-600">Guardar Álbum</button>
         </div>
@@ -902,7 +903,6 @@
             activeTool = toolId;
             isDrawingMode = true;
             editBtn.classList.add('hidden'); // Hide general edit button
-            drawingApplyBtn.classList.remove('hidden'); // Show apply button for drawing
             inpaintCancelBtn.classList.remove('hidden'); // Show cancel button
             overlaySection.classList.add('hidden');
             
@@ -936,7 +936,6 @@
             isDrawingMode = false;
             isDrawing = false;
             editBtn.classList.remove('hidden');
-            drawingApplyBtn.classList.add('hidden');
             inpaintCancelBtn.classList.add('hidden');
             if (generatedImagesHistory.length > 0) overlaySection.classList.remove('hidden');
 
