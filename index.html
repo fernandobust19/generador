@@ -1147,16 +1147,10 @@
 
         function handleDrawStart(e) {
             if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
-            
-            const coords = getEventCoordinates(e);
 
-        // Drawing overlay event listeners
-        resultContainer.addEventListener('mousedown', (e) => {
-            if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
-            
             const currentImageElement = carouselTrack.children[currentImageIndex]?.querySelector('img');
             if (!currentImageElement) return;
-            
+
             isDrawing = true;
             const coords = getEventCoordinates(e);
             const rect = resultContainer.getBoundingClientRect();
@@ -1175,11 +1169,10 @@
                 currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
             }
             e.preventDefault(); // Prevent default behavior
-        });
-        
-        document.addEventListener('mousemove', (e) => {
+        }
+
+        function handleDrawMove(e) {
             if (!isDrawing) return;
-            
             const coords = getEventCoordinates(e);
 
             if (activeTool === 'pencil') {
@@ -1214,30 +1207,40 @@
             currentDrawingArea.style.top = top + 'px';
             currentDrawingArea.style.width = Math.max(width, 10) + 'px';
             currentDrawingArea.style.height = Math.max(height, 10) + 'px';
-        });
-        
-        document.addEventListener('mouseup', () => {
+        }
+
+        function handleDrawEnd() {
             if (!isDrawing) return;
-            
             isDrawing = false;
-            
-            // Check if the drawn area is too small
-            if (currentDrawingArea && (currentDrawingArea.offsetWidth < 20 || currentDrawingArea.offsetHeight < 20)) {
-                currentDrawingArea.remove();
-                currentDrawingArea = null;
-                showError('⚠️ El área seleccionada es muy pequeña. Dibuja un área más grande.');
-                setTimeout(() => hideError(), 3000);
-                return;
-            }
-            
-            // Show success message for the drawn area
-            if (currentDrawingArea) {
-                showError('✅ Área seleccionada. Haz clic en ✏️ para aplicar cambios o en ❌ para eliminar.');
+
+            if (activeTool === 'pencil') {
+                showError('✅ Dibujo terminado. Describe el cambio y haz clic en "Aplicar".');
                 setTimeout(() => hideError(), 4000);
+            } else { // rect or circle
+                if (currentDrawingArea && (currentDrawingArea.offsetWidth < 20 || currentDrawingArea.offsetHeight < 20)) {
+                    currentDrawingArea.remove();
+                    drawingAreas = drawingAreas.filter(a => a !== currentDrawingArea);
+                    currentDrawingArea = null;
+                    showError('⚠️ El área seleccionada es muy pequeña. Dibuja un área más grande.');
+                    setTimeout(() => hideError(), 3000);
+                    return;
+                }
+                if (currentDrawingArea) {
+                    showError('✅ Área seleccionada. Describe el cambio y haz clic en "Aplicar".');
+                    setTimeout(() => hideError(), 4000);
+                }
+                currentDrawingArea = null;
             }
-            
-            currentDrawingArea = null;
-        });
+        }
+
+        // Mouse and Touch event listeners
+        resultContainer.addEventListener('mousedown', handleDrawStart);
+        document.addEventListener('mousemove', handleDrawMove);
+        document.addEventListener('mouseup', handleDrawEnd);
+
+        resultContainer.addEventListener('touchstart', handleDrawStart, { passive: false });
+        document.addEventListener('touchmove', handleDrawMove, { passive: false });
+        document.addEventListener('touchend', handleDrawEnd);
 
         // Add escape key to exit drawing mode
         document.addEventListener('keydown', (e) => {
