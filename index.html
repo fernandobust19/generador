@@ -177,9 +177,13 @@
             touch-action: none;
             user-select: none;
             box-sizing: border-box;
-            padding: 10px;
             cursor: move;
             border: 2px dashed rgba(59, 130, 246, 0.7);
+            /* Add padding inside to avoid text touching the border */
+            padding: 15px; 
+        }
+        #text-overlay-container:hover .interaction-handle {
+            opacity: 1;
         }
         #text-overlay-content {
             font-size: 24px; /* Base font size, will be scaled */
@@ -310,8 +314,7 @@
             </div>
             <div id="text-overlay-container" class="hidden">
                 <div id="text-overlay-content"></div>
-                <div id="text-resize-handle" class="interaction-handle" style="bottom: -10px; right: -10px; cursor: se-resize;"></div>
-                <div id="text-rotate-handle" class="interaction-handle" style="top: -10px; right: -10px; cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>') 16 16, auto;"></div>
+                <div id="text-transform-handle" class="interaction-handle" style="bottom: -10px; right: -10px; cursor: se-resize; opacity: 0; transition: opacity 0.2s;"></div>
             </div>
              <button id="next-btn" class="carousel-btn hidden absolute right-2 p-2 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
             <div id="loader" class="hidden loader absolute"></div>
@@ -368,11 +371,18 @@
                 <div>
                     <label for="text-font-select" class="text-sm text-gray-400 mr-2">Fuente:</label>
                     <select id="text-font-select" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg p-1.5">
-                        <option value="'Inter', sans-serif">Inter</option>
-                        <option value="'Arial', sans-serif">Arial</option>
-                        <option value="'Courier New', monospace">Courier</option>
-                        <option value="'Georgia', serif">Georgia</option>
-                        <option value="'Brush Script MT', cursive">Cursive</option>
+                        <option value="'Inter', sans-serif">Simple (Inter)</option>
+                        <option value="'Arial', sans-serif">Clásica (Arial)</option>
+                        <option value="'Helvetica', sans-serif">Moderna (Helvetica)</option>
+                        <option value="'Times New Roman', serif">Seria (Times)</option>
+                        <option value="'Georgia', serif">Elegante (Georgia)</option>
+                        <option value="'Courier New', monospace">Máquina (Courier)</option>
+                        <option value="'Verdana', sans-serif">Clara (Verdana)</option>
+                        <option value="'Impact', sans-serif">Impacto</option>
+                        <option value="'Comic Sans MS', cursive">Divertida (Comic Sans)</option>
+                        <option value="'Brush Script MT', cursive">Manuscrita (Brush)</option>
+                        <option value="'Lobster', cursive">Estilizada (Lobster)</option>
+                        <option value="'Pacifico', cursive">Suave (Pacifico)</option>
                     </select>
                 </div>
             </div>
@@ -1193,25 +1203,29 @@
             modifiers: [interact.modifiers.restrictRect({ restriction: 'parent', endOnly: true })]
         });
 
-        interact('#text-resize-handle').draggable({
-            onmove: function (event) {
-                const target = textOverlayContainer;
-                const textContent = target.querySelector('#text-overlay-content');
-                const currentSize = parseFloat(window.getComputedStyle(textContent).fontSize);
-                // Scale font size based on diagonal movement
-                const newSize = currentSize + (event.dx + event.dy) / 2;
-                textContent.style.fontSize = Math.max(8, newSize) + 'px'; // Minimum size of 8px
-            }
-        });
-
-        interact('#text-rotate-handle').draggable({
-            onmove: function (event) {
+        interact('#text-transform-handle').draggable({
+            onstart: function(event) {
                 const target = textOverlayContainer;
                 const rect = target.getBoundingClientRect();
-                const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                target.dataset.centerX = rect.left + rect.width / 2;
+                target.dataset.centerY = rect.top + rect.height / 2;
+            },
+            onmove: function(event) {
+                const target = textOverlayContainer;
+                const textContent = target.querySelector('#text-overlay-content');
+                const center = { x: parseFloat(target.dataset.centerX), y: parseFloat(target.dataset.centerY) };
+
+                // --- Rotación ---
                 const angle = Math.atan2(event.clientY - center.y, event.clientX - center.x);
                 const newAngleDeg = (angle * (180 / Math.PI)) + 90;
                 target.setAttribute('data-rotate', newAngleDeg);
+
+                // --- Escalado ---
+                const currentSize = parseFloat(window.getComputedStyle(textContent).fontSize);
+                const scaleFactor = (event.dx + event.dy) * 0.5; // Sensibilidad de escalado
+                const newSize = currentSize + scaleFactor;
+                textContent.style.fontSize = Math.max(8, newSize) + 'px'; // Tamaño mínimo de 8px
+
                 updateTransform(target);
             }
         });
