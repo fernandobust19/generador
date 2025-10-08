@@ -121,7 +121,8 @@
             width: 100%;
             height: 100%;
             cursor: crosshair;
-            pointer-events: none;
+            pointer-events: auto;
+            z-index: 5;
         }
 
         .drawing-area {
@@ -144,13 +145,15 @@
             position: absolute;
             top: -35px;
             right: 0;
-            background: rgba(17, 24, 39, 0.9);
+            background: rgba(17, 24, 39, 0.95);
             border-radius: 6px;
-            padding: 4px;
+            padding: 6px;
             display: flex;
-            gap: 4px;
+            gap: 6px;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(99, 102, 241, 0.3);
         }
 
         .drawing-area:hover .drawing-area-controls {
@@ -158,18 +161,23 @@
         }
 
         .drawing-area-btn {
-            padding: 4px 8px;
+            padding: 6px 10px;
             background: #6366f1;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
-            transition: background 0.2s;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 30px;
         }
 
         .drawing-area-btn:hover {
             background: #818cf8;
+            transform: scale(1.05);
         }
 
         .drawing-prompt-popup {
@@ -937,19 +945,23 @@
             inpaintSection.classList.add('hidden'); // Hide old inpaint section
             
             // Show helper message
-            showError('Modo Dibujo: Arrastra para crear una selección. Presiona ESC para salir.');
-            setTimeout(() => hideError(), 4000);
+            showError('✏️ Modo Dibujo Activo: Arrastra sobre la imagen para crear una selección. Presiona ESC para salir.');
+            setTimeout(() => hideError(), 5000);
             
-            // Highlight the pencil tool
+            // Highlight the active tool
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
-            toolPencil.classList.add('bg-indigo-500');
+            document.getElementById(toolId).classList.add('bg-indigo-500');
             
             // Set cursor for the result container
-            resultContainer.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>') 4 20, crosshair`;
+            resultContainer.style.cursor = 'crosshair';
+            resultContainer.style.userSelect = 'none';
 
             // Clear any existing drawing areas
             drawingAreas.forEach(area => area.remove());
             drawingAreas = [];
+            
+            // Make sure the result container can receive mouse events
+            resultContainer.style.pointerEvents = 'auto';
         }
 
         function deactivateDrawingMode() {
@@ -959,11 +971,17 @@
             overlaySection.classList.remove('hidden');
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
             resultContainer.style.cursor = 'default';
+            resultContainer.style.userSelect = 'auto';
+            resultContainer.style.pointerEvents = 'auto';
             
             if (currentDrawingArea) {
                 currentDrawingArea.remove();
                 currentDrawingArea = null;
             }
+            
+            // Show success message
+            showError('✅ Modo dibujo desactivado. Puedes continuar editando la imagen.');
+            setTimeout(() => hideError(), 3000);
         }
 
         function createDrawingArea(startX, startY, endX, endY) {
@@ -977,14 +995,16 @@
             
             area.style.left = left + 'px';
             area.style.top = top + 'px';
-            area.style.width = width + 'px';
-            area.style.height = height + 'px';
+            area.style.width = Math.max(width, 20) + 'px'; // Minimum width
+            area.style.height = Math.max(height, 20) + 'px'; // Minimum height
+            area.style.zIndex = '10';
+            area.style.position = 'absolute';
             
             // Add controls
             area.innerHTML = `
                 <div class="drawing-area-controls">
-                    <button class="drawing-area-btn apply-btn">Aplicar</button>
-                    <button class="drawing-area-btn remove-btn">Eliminar</button>
+                    <button class="drawing-area-btn apply-btn" title="Aplicar cambio en esta área">✏️</button>
+                    <button class="drawing-area-btn remove-btn" title="Eliminar selección">❌</button>
                 </div>
             `;
             
@@ -1126,7 +1146,11 @@
 
         // Drawing overlay event listeners
         resultContainer.addEventListener('mousedown', (e) => {
-            if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn')) return;
+            if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
+            
+            // Check if we clicked on an image
+            const currentImageElement = carouselTrack.children[currentImageIndex]?.querySelector('img');
+            if (!currentImageElement) return;
             
             isDrawing = true;
             const rect = resultContainer.getBoundingClientRect();
@@ -1139,6 +1163,7 @@
             }
             
             currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
+            e.preventDefault(); // Prevent default behavior
         });
         
         document.addEventListener('mousemove', (e) => {
@@ -1156,8 +1181,8 @@
             
             currentDrawingArea.style.left = left + 'px';
             currentDrawingArea.style.top = top + 'px';
-            currentDrawingArea.style.width = width + 'px';
-            currentDrawingArea.style.height = height + 'px';
+            currentDrawingArea.style.width = Math.max(width, 10) + 'px';
+            currentDrawingArea.style.height = Math.max(height, 10) + 'px';
         });
         
         document.addEventListener('mouseup', () => {
@@ -1169,7 +1194,15 @@
             if (currentDrawingArea && (currentDrawingArea.offsetWidth < 20 || currentDrawingArea.offsetHeight < 20)) {
                 currentDrawingArea.remove();
                 currentDrawingArea = null;
+                showError('⚠️ El área seleccionada es muy pequeña. Dibuja un área más grande.');
+                setTimeout(() => hideError(), 3000);
                 return;
+            }
+            
+            // Show success message for the drawn area
+            if (currentDrawingArea) {
+                showError('✅ Área seleccionada. Haz clic en ✏️ para aplicar cambios o en ❌ para eliminar.');
+                setTimeout(() => hideError(), 4000);
             }
             
             currentDrawingArea = null;
