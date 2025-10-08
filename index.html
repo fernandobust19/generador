@@ -191,11 +191,11 @@
 <body class="text-white flex items-center justify-center min-h-screen p-4">
     <div class="container mx-auto max-w-3xl text-center">
         
-        <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-indigo-500 text-transparent bg-clip-text">
+        <h1 class="text-2xl md:text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-indigo-500 text-transparent bg-clip-text">
             Combinador de Imágenes IA
         </h1>
-        <p class="text-gray-300 mb-8">
-            Sube hasta 3 imágenes, describe cómo combinarlas y deja que la IA cree algo nuevo.
+        <p class="text-gray-400 text-sm mb-8">
+            Sube hasta 3 imágenes y describe cómo combinarlas.
         </p>
 
         <!-- Image upload section -->
@@ -245,7 +245,7 @@
                     <input type="text" id="overlay-prompt-input" class="w-full pl-3 pr-10 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: un fantasma transparente sobre el bosque...">
                 </div>
                 <button id="implement-overlay-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zm0 4a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zm0 4a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" /></svg>
                     <span>Implementar</span>
                 </button>
             </div>
@@ -274,8 +274,8 @@
             <div id="loader" class="hidden loader absolute"></div>
             <div id="error-message" class="hidden text-red-400 absolute"></div>
             <div id="save-actions" class="hidden absolute bottom-4 right-4 z-20 flex gap-2">
-                <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap">Guardar</button>
-                <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap">Guardar Álbum</button>
+                <button id="save-btn" class="styled-button btn-secondary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600">Guardar</button>
+                <button id="save-album-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-md whitespace-nowrap bg-indigo-500 text-white hover:bg-indigo-600">Guardar Álbum</button>
             </div>
         </div>
 
