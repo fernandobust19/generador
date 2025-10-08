@@ -295,7 +295,8 @@
         <div id="edit-section" class="hidden w-full mb-6">
             <div class="relative flex flex-col sm:flex-row gap-2">
                 <input type="text" id="edit-prompt-input" class="w-full pl-3 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
-                <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">Editar</button>
+                <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">Editar</button> <!-- For general edits -->
+                <button id="drawing-apply-btn" class="hidden styled-button btn-secondary py-1 px-4 text-xs rounded-lg whitespace-nowrap">Aplicar</button> <!-- For drawing edits -->
                 <div class="flex items-center gap-1 p-1 border border-indigo-500/50 rounded-lg bg-gray-800/30">
                     <button id="tool-pencil" class="tool-btn p-1 rounded-md hover:bg-indigo-500/50" title="Dibujo libre">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
@@ -307,16 +308,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM2 10a8 8 0 1116 0 8 8 0 01-16 0z" clip-rule="evenodd" /></svg>
                     </button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Inpaint Section -->
-        <div id="inpaint-section" class="hidden w-full mb-6">
-            <p class="text-indigo-300 mb-2 text-sm">Dibuja sobre la imagen para seleccionar un área, luego describe el cambio.</p>
-            <div class="relative flex flex-col sm:flex-row gap-4">
-                <input type="text" id="inpaint-prompt-input" class="w-full pl-3 py-2 text-sm bg-gray-800/50 border border-blue-500/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: un gato negro sentado ahí...">
-                <button id="inpaint-apply-btn" class="styled-button btn-secondary py-2 px-5 text-sm rounded-lg whitespace-nowrap">Aplicar</button>
-                <button id="inpaint-cancel-btn" class="styled-button btn-primary py-2 px-5 text-sm rounded-lg whitespace-nowrap bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-700">Cancelar</button>
+                <button id="inpaint-cancel-btn" class="hidden styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-700">Cancelar</button>
             </div>
         </div>
 
@@ -423,16 +415,13 @@
         const editSection = document.getElementById('edit-section');
         const editPromptInput = document.getElementById('edit-prompt-input');
         const editBtn = document.getElementById('edit-btn');
+        const drawingApplyBtn = document.getElementById('drawing-apply-btn');
         const inpaintCancelBtn = document.getElementById('inpaint-cancel-btn');
         
         // Drawing Tools
         const toolPencil = document.getElementById('tool-pencil');
         const toolRect = document.getElementById('tool-rect');
         const toolCircle = document.getElementById('tool-circle');
-
-
-        // Inpaint Section
-        const inpaintPromptInput = document.getElementById('inpaint-prompt-input');
         
         // Overlay Section
         const overlaySection = document.getElementById('overlay-section');
@@ -914,13 +903,14 @@
             
             activeTool = toolId;
             isDrawingMode = true;
-            editSection.classList.add('hidden');
+            editBtn.classList.add('hidden'); // Hide general edit button
+            drawingApplyBtn.classList.remove('hidden'); // Show apply button for drawing
+            inpaintCancelBtn.classList.remove('hidden'); // Show cancel button
             overlaySection.classList.add('hidden');
-            document.getElementById('inpaint-section').classList.remove('hidden');
             
             // Show helper message
             const toolName = { pencil: 'Lápiz', rect: 'Rectángulo', circle: 'Círculo' }[toolId];
-            showError(`✏️ Modo ${toolName} Activo. Dibuja en la imagen. Presiona ESC o Cancelar para salir.`);
+            showError(`✏️ Modo ${toolName} Activo. Dibuja en la imagen y describe el cambio.`);
             setTimeout(() => hideError(), 5000);
             
             // Highlight the active tool
@@ -947,11 +937,11 @@
         function deactivateDrawingMode() {
             isDrawingMode = false;
             isDrawing = false;
-            if (generatedImagesHistory.length > 0) {
-                editSection.classList.remove('hidden');
-                overlaySection.classList.remove('hidden');
-            }
-            document.getElementById('inpaint-section').classList.add('hidden');
+            editBtn.classList.remove('hidden');
+            drawingApplyBtn.classList.add('hidden');
+            inpaintCancelBtn.classList.add('hidden');
+            if (generatedImagesHistory.length > 0) overlaySection.classList.remove('hidden');
+
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
             resultContainer.style.cursor = 'default';
             resultContainer.style.pointerEvents = 'auto';
@@ -1005,7 +995,7 @@
             
             applyBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                document.getElementById('drawing-prompt-modal').classList.remove('hidden');
+                drawingApplyBtn.click();
             });
             
             removeBtn.addEventListener('click', (e) => {
@@ -1049,24 +1039,13 @@
             return area;
         }
 
-        document.getElementById('drawing-prompt-apply').addEventListener('click', async () => {
-            const prompt = document.getElementById('drawing-prompt-textarea').value.trim();
+        drawingApplyBtn.addEventListener('click', async () => {
+            const prompt = document.getElementById('edit-prompt-input').value.trim();
             if (!prompt) {
                 showError('Por favor describe el cambio que quieres hacer.');
                 return;
             }
-            document.getElementById('drawing-prompt-modal').classList.add('hidden');
             await applyDrawingChange(prompt);
-        });
-
-        document.getElementById('drawing-prompt-cancel').addEventListener('click', () => {
-            document.getElementById('drawing-prompt-modal').classList.add('hidden');
-        });
-
-        document.getElementById('drawing-prompt-modal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('drawing-prompt-modal')) {
-                document.getElementById('drawing-prompt-modal').classList.add('hidden');
-            }
         });
 
 
@@ -1074,7 +1053,6 @@
             let maskData;
 
             if (activeTool === 'pencil') {
-                // The mask is already on maskCanvas
                 const maskDataUrl = maskCanvas.toDataURL('image/png');
                 const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
                 maskData = { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
@@ -1093,6 +1071,9 @@
         function createMaskFromDrawingAreas() {
             const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
             if (!currentImageElement) return null;
+            
+            const imgRect = currentImageElement.getBoundingClientRect();
+            const containerRect = resultContainer.getBoundingClientRect();
 
             const scaleX = currentImageElement.naturalWidth / currentImageElement.clientWidth;
             const scaleY = currentImageElement.naturalHeight / currentImageElement.clientHeight;
@@ -1106,8 +1087,8 @@
             tempCtx.fillStyle = 'white';
 
             drawingAreas.forEach(area => {
-                const areaLeft = (area.offsetLeft - currentImageElement.offsetLeft) * scaleX;
-                const areaTop = (area.offsetTop - currentImageElement.offsetTop) * scaleY;
+                const areaLeft = (area.offsetLeft - (imgRect.left - containerRect.left)) * scaleX;
+                const areaTop = (area.offsetTop - (imgRect.top - containerRect.top)) * scaleY;
                 const areaWidth = area.offsetWidth * scaleX;
                 const areaHeight = area.offsetHeight * scaleY;
 
@@ -1157,6 +1138,18 @@
             maskCtx.lineJoin = 'round';
         }
 
+        function getEventCoordinates(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+            }
+            return { clientX: e.clientX, clientY: e.clientY };
+        }
+
+        function handleDrawStart(e) {
+            if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
+            
+            const coords = getEventCoordinates(e);
+
         // Drawing overlay event listeners
         resultContainer.addEventListener('mousedown', (e) => {
             if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
@@ -1165,20 +1158,20 @@
             if (!currentImageElement) return;
             
             isDrawing = true;
+            const coords = getEventCoordinates(e);
             const rect = resultContainer.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = coords.clientX - rect.left;
+            const y = coords.clientY - rect.top;
 
             if (activeTool === 'pencil') {
                 const maskRect = maskCanvas.getBoundingClientRect();
                 lastPos = {
-                    x: (e.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
-                    y: (e.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
+                    x: (coords.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
+                    y: (coords.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
                 };
             } else { // rect or circle
                 drawStartX = x;
                 drawStartY = y;
-                if (currentDrawingArea) currentDrawingArea.remove();
                 currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
             }
             e.preventDefault(); // Prevent default behavior
@@ -1186,12 +1179,14 @@
         
         document.addEventListener('mousemove', (e) => {
             if (!isDrawing) return;
+            
+            const coords = getEventCoordinates(e);
 
             if (activeTool === 'pencil') {
                 const maskRect = maskCanvas.getBoundingClientRect();
                 const currentPos = {
-                    x: (e.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
-                    y: (e.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
+                    x: (coords.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
+                    y: (coords.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
                 };
 
                 maskCtx.beginPath();
@@ -1206,8 +1201,8 @@
             if (!currentDrawingArea) return;
             
             const rect = resultContainer.getBoundingClientRect();
-            const currentX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-            const currentY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+            const currentX = Math.max(0, Math.min(coords.clientX - rect.left, rect.width));
+            const currentY = Math.max(0, Math.min(coords.clientY - rect.top, rect.height));
             
             // Update the drawing area size
             const left = Math.min(drawStartX, currentX);
