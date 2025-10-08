@@ -220,8 +220,9 @@
         <div id="edit-section" class="hidden w-full mb-6">
             <div class="relative flex flex-col sm:flex-row gap-2">
                 <input type="text" id="edit-prompt-input" class="w-full pl-3 py-1 text-xs bg-gray-800/50 border border-indigo-500/50 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition placeholder-gray-500" placeholder="Edita la imagen actual. Ej: Añade un cielo estrellado...">
-                <button id="edit-btn" class="styled-button btn-primary py-1 px-4 text-xs rounded-lg whitespace-nowrap">
-                    Editar
+                <button id="edit-btn" class="styled-button btn-primary py-1 px-3 text-xs rounded-lg whitespace-nowrap flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                    <span>Editar Área</span>
                 </button>
             </div>
         </div>
@@ -231,7 +232,8 @@
             <p class="text-indigo-300 mb-2 text-sm">Dibuja sobre la imagen para seleccionar un área, luego describe el cambio.</p>
             <div class="relative flex flex-col sm:flex-row gap-4">
                 <input type="text" id="inpaint-prompt-input" class="w-full pl-3 py-2 text-sm bg-gray-800/50 border border-blue-500/50 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition placeholder-gray-500" placeholder="Ej: un gato negro sentado ahí...">
-                <button id="inpaint-apply-btn" class="styled-button btn-secondary py-2 px-5 text-sm rounded-lg whitespace-nowrap">Aplicar Máscara</button>
+                <button id="inpaint-apply-btn" class="styled-button btn-secondary py-2 px-5 text-sm rounded-lg whitespace-nowrap">Aplicar</button>
+                <button id="inpaint-cancel-btn" class="styled-button btn-primary py-2 px-5 text-sm rounded-lg whitespace-nowrap bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-700">Cancelar</button>
             </div>
         </div>
 
@@ -326,6 +328,7 @@
         const inpaintSection = document.getElementById('inpaint-section');
         const inpaintPromptInput = document.getElementById('inpaint-prompt-input');
         const inpaintApplyBtn = document.getElementById('inpaint-apply-btn');
+        const inpaintCancelBtn = document.getElementById('inpaint-cancel-btn');
         
         // Overlay Section
         const overlaySection = document.getElementById('overlay-section');
@@ -653,6 +656,8 @@
             handleImageGeneration(prompt, [imageData], { mask: maskData });
         });
 
+        inpaintCancelBtn.addEventListener('click', deactivateMasking);
+
         implementOverlayBtn.addEventListener('click', async () => {
             const prompt = overlayPromptInput.value.trim();
             if (!prompt) return showError('Describe cómo implementar la imagen flotante.');
@@ -693,7 +698,7 @@
             isMaskingActive = true;
             maskCanvas.classList.remove('hidden');
             inpaintSection.classList.remove('hidden');
-            editSection.classList.add('hidden'); // Hide regular edit
+            editSection.classList.add('hidden'); // Oculta la edición normal y la de superposición
 
             const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
             if (currentImageElement) {
@@ -708,8 +713,10 @@
             isDrawing = false;
             maskCanvas.classList.add('hidden');
             inpaintSection.classList.add('hidden');
-            overlaySection.classList.toggle('hidden', generatedImagesHistory.length === 0);
-            if (generatedImagesHistory.length > 0) editSection.classList.remove('hidden');
+            if (generatedImagesHistory.length > 0) {
+                editSection.classList.remove('hidden');
+                overlaySection.classList.remove('hidden');
+            }
         }
 
         // --- Carousel Logic ---
@@ -859,8 +866,7 @@
             errorMessage.classList.add('hidden');
         }
 
-        // Rename edit button and add listener for masking
-        editBtn.textContent = 'Editar Área';
+        // Add listener for masking
         editBtn.addEventListener('click', activateMasking);
 
         // --- Interact.js for Floating Image ---
