@@ -423,6 +423,7 @@
         const editSection = document.getElementById('edit-section');
         const editPromptInput = document.getElementById('edit-prompt-input');
         const editBtn = document.getElementById('edit-btn');
+        const inpaintCancelBtn = document.getElementById('inpaint-cancel-btn');
         
         // Drawing Tools
         const toolPencil = document.getElementById('tool-pencil');
@@ -431,10 +432,7 @@
 
 
         // Inpaint Section
-        const inpaintSection = document.getElementById('inpaint-section');
         const inpaintPromptInput = document.getElementById('inpaint-prompt-input');
-        const inpaintApplyBtn = document.getElementById('inpaint-apply-btn');
-        const inpaintCancelBtn = document.getElementById('inpaint-cancel-btn');
         
         // Overlay Section
         const overlaySection = document.getElementById('overlay-section');
@@ -476,12 +474,13 @@
         let isDrawing = false;
         let overlayImageData = null;
 
-        // Unified Drawing/Inpainting State
+        // Drawing/Inpainting State
         let isDrawingMode = false;
+        let activeTool = 'rect'; // 'pencil', 'rect', 'circle'
         let currentDrawingArea = null;
         let drawingAreas = [];
         let drawStartX, drawStartY;
-        let startPos = { x: 0, y: 0 };
+        let lastPos = { x: 0, y: 0 };
 
         // La API Key se gestiona de forma segura en el servidor.
 
@@ -752,29 +751,6 @@
             }
         });
 
-        // --- Inpainting / Masking Logic ---
-        inpaintApplyBtn.addEventListener('click', () => {
-            const prompt = inpaintPromptInput.value.trim();
-            if (!prompt) return showError('Por favor, describe el cambio para el área seleccionada.');
-            if (generatedImagesHistory.length === 0) return showError('No hay imagen para editar.');
-
-            // Get current image
-            const currentImage = generatedImagesHistory[currentImageIndex];
-            const [header, base64Data] = currentImage.split(',');
-            const mimeType = header.match(/:(.*?);/)[1];
-            const imageData = { mimeType, data: base64Data };
-
-            // Get mask
-            const maskDataUrl = maskCanvas.toDataURL('image/png');
-            const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
-            const maskMimeType = maskHeader.match(/:(.*?);/)[1];
-            const maskData = { mimeType: maskMimeType, data: maskBase64Data };
-
-            handleImageGeneration(prompt, [imageData], { mask: maskData });
-        });
-
-        inpaintCancelBtn.addEventListener('click', deactivateMasking);
-
         implementOverlayBtn.addEventListener('click', async () => {
             const prompt = overlayPromptInput.value.trim();
             if (!prompt) return showError('Describe cómo implementar la imagen flotante.');
@@ -843,9 +819,7 @@
             overlaySection.classList.toggle('hidden', !hasImages && !isDrawingMode);
             saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2);
             
-            // Deactivate mask and drawing mode when changing image
-            // deactivateMasking(); // This system is removed
-            if (isDrawingMode) {
+            if (isDrawingMode || isDrawing) {
                 deactivateDrawingMode();
             }
         }
@@ -912,9 +886,8 @@
         function setLoadingState(isLoading) {
             hideError();
             loader.classList.toggle('hidden', !isLoading);
-            generateBtn.disabled = isLoading;
+            if(generateBtn) generateBtn.disabled = isLoading;
             editBtn.disabled = isLoading;
-            inpaintApplyBtn.disabled = isLoading;
             implementOverlayBtn.disabled = isLoading;
         }
 
@@ -928,10 +901,10 @@
         }
 
         // Add listeners for drawing tools
-        toolPencil.addEventListener('click', () => activateDrawingMode('tool-pencil'));
-        toolRect.addEventListener('click', () => activateDrawingMode('tool-rect'));
-        toolCircle.addEventListener('click', () => activateDrawingMode('tool-circle'));
-
+        toolPencil.addEventListener('click', () => activateDrawingMode('pencil'));
+        toolRect.addEventListener('click', () => activateDrawingMode('rect'));
+        toolCircle.addEventListener('click', () => activateDrawingMode('circle'));
+        inpaintCancelBtn.addEventListener('click', deactivateDrawingMode);
         // Drawing mode functions
         function activateDrawingMode(toolId) {
             if (generatedImagesHistory.length === 0) {
@@ -939,22 +912,23 @@
                 return;
             }
             
+            activeTool = toolId;
             isDrawingMode = true;
             editSection.classList.add('hidden');
             overlaySection.classList.add('hidden');
-            inpaintSection.classList.add('hidden'); // Hide old inpaint section
+            document.getElementById('inpaint-section').classList.remove('hidden');
             
             // Show helper message
-            showError('✏️ Modo Dibujo Activo: Arrastra sobre la imagen para crear una selección. Presiona ESC para salir.');
+            const toolName = { pencil: 'Lápiz', rect: 'Rectángulo', circle: 'Círculo' }[toolId];
+            showError(`✏️ Modo ${toolName} Activo. Dibuja en la imagen. Presiona ESC o Cancelar para salir.`);
             setTimeout(() => hideError(), 5000);
             
             // Highlight the active tool
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
-            document.getElementById(toolId).classList.add('bg-indigo-500');
+            document.getElementById(`tool-${toolId}`).classList.add('bg-indigo-500');
             
             // Set cursor for the result container
             resultContainer.style.cursor = 'crosshair';
-            resultContainer.style.userSelect = 'none';
 
             // Clear any existing drawing areas
             drawingAreas.forEach(area => area.remove());
@@ -962,25 +936,39 @@
             
             // Make sure the result container can receive mouse events
             resultContainer.style.pointerEvents = 'auto';
+
+            if (activeTool === 'pencil') {
+                setupMaskCanvas();
+            } else {
+                maskCanvas.classList.add('hidden');
+            }
         }
 
         function deactivateDrawingMode() {
             isDrawingMode = false;
             isDrawing = false;
-            editSection.classList.remove('hidden');
-            overlaySection.classList.remove('hidden');
+            if (generatedImagesHistory.length > 0) {
+                editSection.classList.remove('hidden');
+                overlaySection.classList.remove('hidden');
+            }
+            document.getElementById('inpaint-section').classList.add('hidden');
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('bg-indigo-500'));
             resultContainer.style.cursor = 'default';
-            resultContainer.style.userSelect = 'auto';
             resultContainer.style.pointerEvents = 'auto';
             
-            if (currentDrawingArea) {
-                currentDrawingArea.remove();
-                currentDrawingArea = null;
+            drawingAreas.forEach(area => area.remove());
+            drawingAreas = [];
+            currentDrawingArea = null;
+
+            // Clear and hide mask canvas
+            if (!maskCanvas.classList.contains('hidden')) {
+                maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                maskCanvas.classList.add('hidden');
             }
             
-            // Show success message
-            showError('✅ Modo dibujo desactivado. Puedes continuar editando la imagen.');
+            // Show message
+            hideError();
+            showError('✅ Modo dibujo desactivado.');
             setTimeout(() => hideError(), 3000);
         }
 
@@ -998,6 +986,9 @@
             area.style.width = Math.max(width, 20) + 'px'; // Minimum width
             area.style.height = Math.max(height, 20) + 'px'; // Minimum height
             area.style.zIndex = '10';
+            if (activeTool === 'circle') {
+                area.style.borderRadius = '50%';
+            }
             area.style.position = 'absolute';
             
             // Add controls
@@ -1014,7 +1005,7 @@
             
             applyBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                showDrawingPromptPopup(area);
+                document.getElementById('drawing-prompt-modal').classList.remove('hidden');
             });
             
             removeBtn.addEventListener('click', (e) => {
@@ -1058,64 +1049,54 @@
             return area;
         }
 
-        function showDrawingPromptPopup(area) {
-            const modal = document.getElementById('drawing-prompt-modal');
-            const textarea = document.getElementById('drawing-prompt-textarea');
-            const cancelBtn = document.getElementById('drawing-prompt-cancel');
-            const applyBtn = document.getElementById('drawing-prompt-apply');
-            
-            // Clear previous content
-            textarea.value = '';
-            
-            // Show modal
-            modal.classList.remove('hidden');
-            textarea.focus();
-            
-            // Remove previous event listeners
-            const newCancelBtn = cancelBtn.cloneNode(true);
-            const newApplyBtn = applyBtn.cloneNode(true);
-            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-            applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
-            
-            // Add new event listeners
-            newCancelBtn.addEventListener('click', () => {
-                modal.classList.add('hidden');
-            });
-            
-            newApplyBtn.addEventListener('click', async () => {
-                const prompt = textarea.value.trim();
-                if (!prompt) {
-                    showError('Por favor describe el cambio que quieres hacer.');
+        document.getElementById('drawing-prompt-apply').addEventListener('click', async () => {
+            const prompt = document.getElementById('drawing-prompt-textarea').value.trim();
+            if (!prompt) {
+                showError('Por favor describe el cambio que quieres hacer.');
+                return;
+            }
+            document.getElementById('drawing-prompt-modal').classList.add('hidden');
+            await applyDrawingChange(prompt);
+        });
+
+        document.getElementById('drawing-prompt-cancel').addEventListener('click', () => {
+            document.getElementById('drawing-prompt-modal').classList.add('hidden');
+        });
+
+        document.getElementById('drawing-prompt-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('drawing-prompt-modal')) {
+                document.getElementById('drawing-prompt-modal').classList.add('hidden');
+            }
+        });
+
+
+        async function applyDrawingChange(prompt) {
+            let maskData;
+
+            if (activeTool === 'pencil') {
+                // The mask is already on maskCanvas
+                const maskDataUrl = maskCanvas.toDataURL('image/png');
+                const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
+                maskData = { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
+            } else {
+                // Create mask from drawing areas (rect/circle)
+                if (drawingAreas.length === 0) {
+                    showError("No se ha seleccionado ningún área.");
                     return;
                 }
-                
-                modal.classList.add('hidden');
-                await applyDrawingAreaChange(area, prompt);
-            });
+                maskData = createMaskFromDrawingAreas();
+            }
             
-            // Close modal when clicking outside
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.add('hidden');
-                }
-            });
+            await performInpaint(prompt, maskData);
         }
 
-        async function applyDrawingAreaChange(area, prompt) {
-            // Create mask from the drawing area
+        function createMaskFromDrawingAreas() {
             const currentImageElement = carouselTrack.children[currentImageIndex].querySelector('img');
-            const resultRect = resultContainer.getBoundingClientRect();
-            
-            // Calculate relative position and size
+            if (!currentImageElement) return null;
+
             const scaleX = currentImageElement.naturalWidth / currentImageElement.clientWidth;
             const scaleY = currentImageElement.naturalHeight / currentImageElement.clientHeight;
             
-            const areaLeft = (area.offsetLeft - currentImageElement.offsetLeft) * scaleX;
-            const areaTop = (area.offsetTop - currentImageElement.offsetTop) * scaleY;
-            const areaWidth = area.offsetWidth * scaleX;
-            const areaHeight = area.offsetHeight * scaleY;
-            
-            // Create mask canvas
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = currentImageElement.naturalWidth;
             tempCanvas.height = currentImageElement.naturalHeight;
@@ -1123,51 +1104,106 @@
             
             // Fill the selected area with white (mask area)
             tempCtx.fillStyle = 'white';
-            tempCtx.fillRect(areaLeft, areaTop, areaWidth, areaHeight);
+
+            drawingAreas.forEach(area => {
+                const areaLeft = (area.offsetLeft - currentImageElement.offsetLeft) * scaleX;
+                const areaTop = (area.offsetTop - currentImageElement.offsetTop) * scaleY;
+                const areaWidth = area.offsetWidth * scaleX;
+                const areaHeight = area.offsetHeight * scaleY;
+
+                if (area.style.borderRadius === '50%') { // Circle
+                    tempCtx.beginPath();
+                    tempCtx.ellipse(areaLeft + areaWidth / 2, areaTop + areaHeight / 2, areaWidth / 2, areaHeight / 2, 0, 0, 2 * Math.PI);
+                    tempCtx.fill();
+                } else { // Rectangle
+                    tempCtx.fillRect(areaLeft, areaTop, areaWidth, areaHeight);
+                }
+            });
             
-            // Get mask data
             const maskDataUrl = tempCanvas.toDataURL('image/png');
             const [maskHeader, maskBase64Data] = maskDataUrl.split(',');
-            const maskData = { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
-            
-            // Get current image
+            return { mimeType: maskHeader.match(/:(.*?);/)[1], data: maskBase64Data };
+        }
+
+        async function performInpaint(prompt, maskData) {
             const currentImage = generatedImagesHistory[currentImageIndex];
             const [header, base64Data] = currentImage.split(',');
             const imageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
             
-            // Apply the change
             await handleImageGeneration(prompt, [imageData], { mask: maskData });
             
-            // Remove the drawing area and deactivate drawing mode
-            area.remove();
-            drawingAreas = drawingAreas.filter(a => a !== area);
             deactivateDrawingMode();
+        }
+
+        function setupMaskCanvas() {
+            const currentImageElement = carouselTrack.children[currentImageIndex]?.querySelector('img');
+            if (!currentImageElement) return;
+
+            const rect = currentImageElement.getBoundingClientRect();
+            const containerRect = resultContainer.getBoundingClientRect();
+
+            maskCanvas.width = currentImageElement.naturalWidth;
+            maskCanvas.height = currentImageElement.naturalHeight;
+            maskCanvas.style.width = rect.width + 'px';
+            maskCanvas.style.height = rect.height + 'px';
+            maskCanvas.style.left = (rect.left - containerRect.left) + 'px';
+            maskCanvas.style.top = (rect.top - containerRect.top) + 'px';
+            maskCanvas.classList.remove('hidden');
+
+            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+            maskCtx.strokeStyle = 'white';
+            maskCtx.lineWidth = 30; // Adjust brush size
+            maskCtx.lineCap = 'round';
+            maskCtx.lineJoin = 'round';
         }
 
         // Drawing overlay event listeners
         resultContainer.addEventListener('mousedown', (e) => {
             if (!isDrawingMode || e.target.closest('.drawing-area') || e.target.closest('.carousel-btn') || e.target.closest('#floating-image-container')) return;
             
-            // Check if we clicked on an image
             const currentImageElement = carouselTrack.children[currentImageIndex]?.querySelector('img');
             if (!currentImageElement) return;
             
             isDrawing = true;
             const rect = resultContainer.getBoundingClientRect();
-            drawStartX = e.clientX - rect.left;
-            drawStartY = e.clientY - rect.top;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
 
-            // Remove any existing temporary drawing area
-            if (currentDrawingArea) {
-                currentDrawingArea.remove();
+            if (activeTool === 'pencil') {
+                const maskRect = maskCanvas.getBoundingClientRect();
+                lastPos = {
+                    x: (e.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
+                    y: (e.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
+                };
+            } else { // rect or circle
+                drawStartX = x;
+                drawStartY = y;
+                if (currentDrawingArea) currentDrawingArea.remove();
+                currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
             }
-            
-            currentDrawingArea = createDrawingArea(drawStartX, drawStartY, drawStartX, drawStartY);
             e.preventDefault(); // Prevent default behavior
         });
         
         document.addEventListener('mousemove', (e) => {
-            if (!isDrawing || !currentDrawingArea) return;
+            if (!isDrawing) return;
+
+            if (activeTool === 'pencil') {
+                const maskRect = maskCanvas.getBoundingClientRect();
+                const currentPos = {
+                    x: (e.clientX - maskRect.left) * (maskCanvas.width / maskRect.width),
+                    y: (e.clientY - maskRect.top) * (maskCanvas.height / maskRect.height)
+                };
+
+                maskCtx.beginPath();
+                maskCtx.moveTo(lastPos.x, lastPos.y);
+                maskCtx.lineTo(currentPos.x, currentPos.y);
+                maskCtx.stroke();
+
+                lastPos = currentPos;
+                return;
+            }
+
+            if (!currentDrawingArea) return;
             
             const rect = resultContainer.getBoundingClientRect();
             const currentX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
