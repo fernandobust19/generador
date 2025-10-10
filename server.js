@@ -33,6 +33,11 @@ try {
 // PayPal configuration
 let paypalClient;
 try {
+    console.log('🔵 Configurando PayPal...');
+    console.log('PAYPAL_CLIENT_ID existe:', !!process.env.PAYPAL_CLIENT_ID);
+    console.log('PAYPAL_CLIENT_SECRET existe:', !!process.env.PAYPAL_CLIENT_SECRET);
+    console.log('PAYPAL_ENVIRONMENT:', process.env.PAYPAL_ENVIRONMENT);
+    
     if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) {
         // Configurar el entorno de PayPal
         let environment;
@@ -41,20 +46,25 @@ try {
                 process.env.PAYPAL_CLIENT_ID, 
                 process.env.PAYPAL_CLIENT_SECRET
             );
+            console.log('🟢 Usando entorno LIVE de PayPal');
         } else {
             environment = new checkoutNodeJssdk.core.SandboxEnvironment(
                 process.env.PAYPAL_CLIENT_ID, 
                 process.env.PAYPAL_CLIENT_SECRET
             );
+            console.log('🟡 Usando entorno SANDBOX de PayPal');
         }
         
         paypalClient = new checkoutNodeJssdk.core.PayPalHttpClient(environment);
-        console.log('✅ PayPal configurado correctamente (' + process.env.PAYPAL_ENVIRONMENT + ')');
+        console.log('✅ PayPal configurado correctamente (' + (process.env.PAYPAL_ENVIRONMENT || 'sandbox') + ')');
     } else {
         console.log('⚠️ Credenciales de PayPal no encontradas - funciones de pago PayPal deshabilitadas');
+        console.log('CLIENT_ID presente:', !!process.env.PAYPAL_CLIENT_ID);
+        console.log('CLIENT_SECRET presente:', !!process.env.PAYPAL_CLIENT_SECRET);
     }
 } catch (error) {
-    console.log('⚠️ Error configurando PayPal:', error.message);
+    console.log('❌ Error configurando PayPal:', error.message);
+    console.log('Error stack:', error.stack);
 }
 
 // Endpoint que recibirá las peticiones desde tu página web
@@ -162,16 +172,24 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req,
 // PayPal endpoints
 // Crear orden de PayPal
 app.post('/api/paypal/create-order', async (req, res) => {
+    console.log('🔵 PayPal create-order request received');
+    console.log('Request body:', req.body);
+    console.log('PayPal environment:', process.env.PAYPAL_ENVIRONMENT);
+    console.log('PayPal client configured:', !!paypalClient);
+    
     try {
         if (!paypalClient) {
+            console.error('❌ PayPal client not configured');
             return res.status(500).json({ error: 'PayPal no está configurado en el servidor' });
         }
 
         const { amount, currency, userId, plan } = req.body;
+        console.log('Order details:', { amount, currency, userId, plan });
 
         const request = new checkoutNodeJssdk.orders.OrdersCreateRequest();
         request.prefer("return=representation");
-        request.requestBody({
+        
+        const orderData = {
             intent: 'CAPTURE',
             purchase_units: [{
                 amount: {
@@ -185,9 +203,15 @@ app.post('/api/paypal/create-order', async (req, res) => {
                 cancel_url: `${req.headers.origin}?payment=cancelled`,
                 user_action: 'PAY_NOW'
             }
-        });
+        };
+        
+        console.log('PayPal order data:', JSON.stringify(orderData, null, 2));
+        request.requestBody(orderData);
 
+        console.log('⏳ Executing PayPal order creation...');
         const response = await paypalClient.execute(request);
+        console.log('✅ PayPal order created successfully');
+        console.log('Order response:', response.result);
 
         res.json({ 
             orderID: response.result.id,
@@ -195,8 +219,16 @@ app.post('/api/paypal/create-order', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error creating PayPal order:', error);
-        res.status(500).json({ error: 'Error creando orden de PayPal' });
+        console.error('❌ Error creating PayPal order:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            statusCode: error.statusCode
+        });
+        res.status(500).json({ 
+            error: 'Error creando orden de PayPal',
+            details: error.message
+        });
     }
 });
 
@@ -239,6 +271,23 @@ app.get('/api/paypal/config', (req, res) => {
     res.json({
         clientId: process.env.PAYPAL_CLIENT_ID,
         environment: process.env.PAYPAL_ENVIRONMENT || 'sandbox'
+    });
+});
+
+// Endpoint de diagnóstico para verificar configuración
+app.get('/api/status', (req, res) => {
+    res.json({
+        paypal: {
+            configured: !!paypalClient,
+            environment: process.env.PAYPAL_ENVIRONMENT || 'sandbox',
+            hasClientId: !!process.env.PAYPAL_CLIENT_ID,
+            hasClientSecret: !!process.env.PAYPAL_CLIENT_SECRET,
+            clientIdLength: process.env.PAYPAL_CLIENT_ID ? process.env.PAYPAL_CLIENT_ID.length : 0
+        },
+        server: {
+            nodeVersion: process.version,
+            timestamp: new Date().toISOString()
+        }
     });
 });
 
