@@ -2,12 +2,13 @@ import express from 'express';
 import fetch from 'node-fetch'; // Necesitarás instalar node-fetch v2: npm install node-fetch@2
 import dotenv from 'dotenv';
 import path from 'path';
+import checkoutNodeJssdk from '@paypal/checkout-server-sdk';
 
 // Cargar variables de entorno desde el archivo .env
 dotenv.config();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // PASO CRÍTICO: El middleware para parsear JSON debe ir primero para procesar req.body.
 // Middleware para parsear JSON (con un límite mayor para las imágenes). Debe ir ANTES de las rutas que lo usan.
@@ -27,6 +28,33 @@ try {
     }
 } catch (error) {
     console.log('⚠️ Stripe no instalado - funciones de pago deshabilitadas');
+}
+
+// PayPal configuration
+let paypalClient;
+try {
+    if (process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET) {
+        // Configurar el entorno de PayPal
+        let environment;
+        if (process.env.PAYPAL_ENVIRONMENT === 'live') {
+            environment = new checkoutNodeJssdk.core.LiveEnvironment(
+                process.env.PAYPAL_CLIENT_ID, 
+                process.env.PAYPAL_CLIENT_SECRET
+            );
+        } else {
+            environment = new checkoutNodeJssdk.core.SandboxEnvironment(
+                process.env.PAYPAL_CLIENT_ID, 
+                process.env.PAYPAL_CLIENT_SECRET
+            );
+        }
+        
+        paypalClient = new checkoutNodeJssdk.core.PayPalHttpClient(environment);
+        console.log('✅ PayPal configurado correctamente (' + process.env.PAYPAL_ENVIRONMENT + ')');
+    } else {
+        console.log('⚠️ Credenciales de PayPal no encontradas - funciones de pago PayPal deshabilitadas');
+    }
+} catch (error) {
+    console.log('⚠️ Error configurando PayPal:', error.message);
 }
 
 // Endpoint que recibirá las peticiones desde tu página web
@@ -129,6 +157,89 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req,
         console.error('Webhook signature verification failed:', error);
         res.status(400).send('Webhook Error');
     }
+});
+
+// PayPal endpoints
+// Crear orden de PayPal
+app.post('/api/paypal/create-order', async (req, res) => {
+    try {
+        if (!paypalClient) {
+            return res.status(500).json({ error: 'PayPal no está configurado en el servidor' });
+        }
+
+        const { amount, currency, userId, plan } = req.body;
+
+        const request = new checkoutNodeJssdk.orders.OrdersCreateRequest();
+        request.prefer("return=representation");
+        request.requestBody({
+            intent: 'CAPTURE',
+            purchase_units: [{
+                amount: {
+                    currency_code: currency || 'USD',
+                    value: amount.toString()
+                },
+                description: `Suscripción ${plan} - Usuario ${userId}`
+            }],
+            application_context: {
+                return_url: `${req.headers.origin}?payment=success&plan=${plan}&userId=${userId}`,
+                cancel_url: `${req.headers.origin}?payment=cancelled`,
+                user_action: 'PAY_NOW'
+            }
+        });
+
+        const response = await paypalClient.execute(request);
+
+        res.json({ 
+            orderID: response.result.id,
+            status: response.result.status
+        });
+
+    } catch (error) {
+        console.error('Error creating PayPal order:', error);
+        res.status(500).json({ error: 'Error creando orden de PayPal' });
+    }
+});
+
+// Capturar pago de PayPal
+app.post('/api/paypal/capture-order', async (req, res) => {
+    try {
+        if (!paypalClient) {
+            return res.status(500).json({ error: 'PayPal no está configurado en el servidor' });
+        }
+
+        const { orderID } = req.body;
+
+        const request = new checkoutNodeJssdk.orders.OrdersCaptureRequest(orderID);
+        request.prefer("return=representation");
+        request.requestBody({});
+
+        const response = await paypalClient.execute(request);
+
+        if (response.result.status === 'COMPLETED') {
+            const payerInfo = response.result.payer;
+            console.log('PayPal payment successful for:', payerInfo.email_address);
+            
+            res.json({ 
+                success: true,
+                orderID: response.result.id,
+                payerInfo: payerInfo
+            });
+        } else {
+            res.status(400).json({ error: 'El pago no se pudo completar' });
+        }
+
+    } catch (error) {
+        console.error('Error capturing PayPal payment:', error);
+        res.status(500).json({ error: 'Error procesando pago de PayPal' });
+    }
+});
+
+// Endpoint para obtener configuración de PayPal
+app.get('/api/paypal/config', (req, res) => {
+    res.json({
+        clientId: process.env.PAYPAL_CLIENT_ID,
+        environment: process.env.PAYPAL_ENVIRONMENT || 'sandbox'
+    });
 });
 
 // Middleware para servir archivos estáticos (como tu index.html). Debe ir DESPUÉS de las rutas de la API.
