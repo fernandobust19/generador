@@ -387,25 +387,27 @@
 <body class="text-white flex items-center justify-center min-h-screen p-4">
     <div class="container mx-auto max-w-3xl text-center w-full px-2 sm:px-4">
         
-        <!-- Plan Status Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-            <div class="flex items-center">
-                <h1 class="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 text-transparent bg-clip-text text-center sm:text-left">
-                    Combinador de Imágenes IA
-                </h1>
-            </div>
-            <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-                <div id="plan-status" class="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-full text-xs font-medium">
-                    <span id="plan-badge" class="px-1 sm:px-2 py-1 rounded-full text-xs">GRATIS</span>
-                    <span id="usage-count" class="text-gray-300 text-xs">0/5 usos</span>
-                </div>
-                <button id="upgrade-btn" class="hidden px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition whitespace-nowrap">
-                    ⚡ PREMIUM
-                </button>
-            </div>
+        <!-- Título Principal -->
+        <div class="mb-6">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 text-transparent bg-clip-text">
+                COMBINADOR DE IMÁGENES IA
+            </h1>
         </div>
+
+        <!-- Botones de Pago -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-2 mb-6">
+            <div id="plan-status" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border border-gray-600 bg-gray-800/50">
+                <span id="plan-badge" class="px-2 py-0.5 rounded-full text-xs bg-green-600">GRATIS</span>
+                <span id="usage-count" class="text-gray-300">0/5 usos</span>
+            </div>
+            <button id="upgrade-btn" class="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-medium rounded-full hover:from-purple-600 hover:to-pink-600 transition">
+                ⚡ PREMIUM
+            </button>
+        </div>
+
+        <!-- Texto Descriptivo -->
         <p class="text-gray-400 text-sm mb-8">
-            Sube hasta 3 imágenes y describe cómo combinarlas.
+            Sube hasta 3 imágenes y describe cómo combinarlas con inteligencia artificial.
         </p>
 
         <!-- Image upload section -->
@@ -872,8 +874,6 @@
                 });
             }
         }
-        createUploadSlots();
-
 
         // --- Modal & Camera Logic ---
         closeSourceModalBtn.addEventListener('click', () => sourceModal.classList.add('hidden'));
