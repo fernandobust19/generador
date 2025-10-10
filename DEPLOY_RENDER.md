@@ -44,9 +44,9 @@ En el dashboard de Render, ve a "Environment" y agrega:
 
 ```
 NODE_ENV=production
-GEMINI_API_KEY=AIzaSyDD70RGjU3xluzslV32-dqe1Lq5e-KYrDM
-PAYPAL_CLIENT_ID=AZzv7SbQoudYpLBo118-5g0mFet1JG_nTC3NAPmE_VAbX0SPaPmXTvmsnw7chjF5cY9sKJExZ4bZqQg2
-PAYPAL_CLIENT_SECRET=EDdw_zXCcq3IFH0COBYdcbu_DvNASc-IWemvPs0HnszR5ybd4gPOnaFqW8TyUHoyu6cJGI4tKKJqbB3n
+GEMINI_API_KEY=tu_gemini_api_key_aqui
+PAYPAL_CLIENT_ID=tu_paypal_client_id_de_produccion
+PAYPAL_CLIENT_SECRET=tu_paypal_client_secret_de_produccion  
 PAYPAL_ENVIRONMENT=live
 ```
 
