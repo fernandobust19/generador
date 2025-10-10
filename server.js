@@ -15,6 +15,20 @@ app.use(express.json({ limit: '50mb' }));
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
+// Stripe configuration (optional)
+let stripe;
+try {
+    const Stripe = (await import('stripe')).default;
+    if (process.env.STRIPE_SECRET_KEY) {
+        stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        console.log('✅ Stripe configurado correctamente');
+    } else {
+        console.log('⚠️ STRIPE_SECRET_KEY no encontrada - funciones de pago deshabilitadas');
+    }
+} catch (error) {
+    console.log('⚠️ Stripe no instalado - funciones de pago deshabilitadas');
+}
+
 // Endpoint que recibirá las peticiones desde tu página web
 app.post('/api/generate', async (req, res) => {
     if (!API_KEY) {
@@ -59,6 +73,61 @@ app.post('/api/generate', async (req, res) => {
     } catch (error) {
         console.error('Error al contactar con la API de Google o error interno:', error);
         res.status(500).json({ error: { message: 'Error interno del servidor proxy. Revisa los logs.' } });
+    }
+});
+
+// Endpoint para crear sesiones de checkout de Stripe
+app.post('/api/create-checkout-session', async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(500).json({ error: 'Stripe no está configurado en el servidor' });
+        }
+
+        const { priceId, userId, plan } = req.body;
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price: priceId || 'price_1234567890', // Replace with your actual Stripe price ID
+                quantity: 1,
+            }],
+            mode: 'subscription',
+            success_url: `${req.headers.origin}?payment=success&plan=${plan}&userId=${userId}`,
+            cancel_url: `${req.headers.origin}?payment=cancelled`,
+            metadata: {
+                userId: userId,
+                plan: plan
+            }
+        });
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Error creating checkout session:', error);
+        res.status(500).json({ error: 'Error creando sesión de pago' });
+    }
+});
+
+// Webhook para manejar eventos de Stripe
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req, res) => {
+    if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+        return res.status(400).send('Webhook not configured');
+    }
+
+    const sig = req.headers['stripe-signature'];
+    
+    try {
+        const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            console.log('Payment successful for user:', session.metadata.userId);
+            // Here you would update your database to mark the user as premium
+        }
+        
+        res.json({ received: true });
+    } catch (error) {
+        console.error('Webhook signature verification failed:', error);
+        res.status(400).send('Webhook Error');
     }
 });
 
