@@ -225,6 +225,14 @@ app.post('/api/generate', async (req, res) => {
             let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
             // Mejorar calidad según la selección del cliente
             const qualityLevel = (req.body.imageQuality || 'fast').toLowerCase();
+            // Contexto base para mejorar coherencia/calidad en niveles altos
+            const qualityContext = `You are generating a single professional-quality image with:
+- clean composition (rule of thirds or centered when appropriate)
+- realistic lighting and natural shadows
+- sharp focus, correct anatomy and proportions
+- natural textures and balanced colors
+- uncluttered background without unnecessary elements
+Avoid: blurry, deformed, distorted, asymmetry, extra fingers/limbs, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, out of frame.`;
             const qualitySuffixMap = {
                 fast: '',
                 standard: ' Render with high detail, sharp focus, realistic lighting, natural textures, correct anatomy, clean composition.',
@@ -232,7 +240,8 @@ app.post('/api/generate', async (req, res) => {
             };
             const qualitySuffix = qualitySuffixMap[qualityLevel] || '';
             if (qualitySuffix) {
-                promptText = `${promptText}\n${qualitySuffix}`.trim();
+                // Prepend contexto y añadir sufijo de calidad
+                promptText = `${qualityContext}\n\n${promptText}\n${qualitySuffix}`.trim();
             }
             // Detectar si viene una imagen inline desde el frontend
             const inlineImagePart = req.body.contents?.[0]?.parts?.find(p => p.inlineData);
