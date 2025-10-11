@@ -5,7 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Combinador de Imágenes con IA</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪄</text></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <script>
@@ -772,78 +783,71 @@
         let isDrawingMode = false;
         let lastPos = { x: 0, y: 0 };
 
-        // --- Plan & Limits System ---
-        let userPlan = 'free'; // 'free' or 'premium'
-        let dailyUsageCount = 0;
-        let maxDailyUsage = 5; // Free plan limit
-        let lastUsageDate = new Date().toDateString();
+        // --- Plan & Limits System (Server-Side) ---
+        let userPlan = 'free';
         let userId = null;
 
-        // La API Key se gestiona de forma segura en el servidor.
-
-        // --- Plan & Limits Functions ---
-        function initializePlanSystem() {
-            // Load user data from localStorage
-            userId = localStorage.getItem('userId') || generateUserId();
-            userPlan = localStorage.getItem('userPlan') || 'free';
-            dailyUsageCount = parseInt(localStorage.getItem('dailyUsageCount') || '0', 10);
-            lastUsageDate = localStorage.getItem('lastUsageDate') || new Date().toDateString();
-            
-            // Reset daily count if it's a new day
-            const today = new Date().toDateString();
-            if (lastUsageDate !== today) {
-                dailyUsageCount = 0;
-                lastUsageDate = today;
-                localStorage.setItem('dailyUsageCount', '0');
-                localStorage.setItem('lastUsageDate', today);
+        function getUserId() {
+            if (!userId) {
+                userId = localStorage.getItem('userId') || 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('userId', userId);
             }
-            
-            // Set limits based on plan
-            maxDailyUsage = userPlan === 'premium' ? Infinity : 5;
+            return userId;
         }
 
-        function generateUserId() {
-            const id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('userId', id);
-            return id;
+        function checkPremiumStatus() {
+            return localStorage.getItem('userPlan') === 'premium';
         }
 
-        function updatePlanUI() {
-            if (userPlan === 'premium') {
+        async function fetchAndUpdateLimits() {
+            const currentUserId = getUserId();
+            const isPremium = checkPremiumStatus();
+            try {
+                const response = await fetch(`/api/limits/${currentUserId}?premium=${isPremium}`);
+                if (!response.ok) throw new Error('Could not fetch limits');
+                const data = await response.json();
+                updatePlanUI(data.limits);
+            } catch (error) {
+                console.error("Error fetching limits:", error);
+                // Fallback UI
+                usageCount.textContent = 'Error al cargar';
+            }
+        }
+
+        function updatePlanUI(limits) {
+            const isPremium = checkPremiumStatus();
+            if (isPremium) {
                 planBadge.textContent = 'PREMIUM';
                 planBadge.className = 'px-2 py-1 rounded-full plan-premium';
-                usageCount.textContent = '∞ ilimitado';
+                // Para premium, podrías mostrar el uso diario si quieres
+                usageCount.textContent = `${limits.used}/${limits.limit} usos diarios`;
                 usageCount.className = 'text-purple-400';
                 upgradeBtn.classList.add('hidden');
             } else {
                 planBadge.textContent = 'GRATIS';
                 planBadge.className = 'px-2 py-1 rounded-full plan-free';
-                usageCount.textContent = `${dailyUsageCount}/${maxDailyUsage} usos`;
-                
-                // Change color based on usage
-                if (dailyUsageCount >= maxDailyUsage) {
-                    usageCount.className = 'usage-limit';
-                } else if (dailyUsageCount >= maxDailyUsage - 1) {
-                    usageCount.className = 'usage-warning';
+                usageCount.textContent = `${limits.used}/${limits.limit} usos`;
+
+                if (limits.used >= limits.limit) {
+                    usageCount.className = 'text-sm text-red-500 font-semibold';
+                } else if (limits.used >= limits.limit - 5) { // Advertencia en los últimos 5
+                    usageCount.className = 'text-sm text-yellow-500 font-semibold';
                 } else {
                     usageCount.className = 'text-gray-300';
                 }
-                
                 upgradeBtn.classList.remove('hidden');
             }
         }
 
-        function canGenerateImage() {
-            return userPlan === 'premium' || dailyUsageCount < maxDailyUsage;
-        }
-
-        function consumeUsage() {
-            if (userPlan === 'free') {
-                dailyUsageCount++;
-                localStorage.setItem('dailyUsageCount', dailyUsageCount.toString());
-                updatePlanUI();
-            }
-        }
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for payment success from URL parameters
+            checkPaymentResult();
+            
+            // Initialize plan system
+            fetchAndUpdateLimits();
+            createUploadSlots();
+        });
 
         function showUpgradeModal() {
             pricingModal.classList.remove('hidden');
@@ -872,13 +876,6 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Check for payment success from URL parameters
-            checkPaymentResult();
-            
-            // Initialize plan system
-            initializePlanSystem();
-            updatePlanUI();
-            createUploadSlots();
         });
 
         function createUploadSlots() {
@@ -1071,6 +1068,7 @@
             // Mostrar información de uso si está disponible
             if (result.usage) {
                 updateUsageDisplay(result.usage);
+                updatePlanUI(result.usage); // Actualizar UI con la info del servidor
             }
             
             return result;
@@ -1189,13 +1187,8 @@
             if (!prompt) return showError('Por favor, describe cómo combinar las imágenes.');
             
             // Check usage limits
-            if (!canGenerateImage()) {
-                showUpgradeModal();
-                return;
-            }
 
             // Consume usage and generate
-            consumeUsage();
             handleImageGeneration(prompt, validImages);
         });
 

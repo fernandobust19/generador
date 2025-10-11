@@ -3,6 +3,7 @@ import fetch from 'node-fetch'; // Necesitarás instalar node-fetch v2: npm inst
 import dotenv from 'dotenv';
 import path from 'path';
 import checkoutNodeJssdk from '@paypal/checkout-server-sdk';
+import { GoogleAuth } from 'google-auth-library';
 
 // Cargar variables de entorno desde el archivo .env
 dotenv.config();
@@ -16,6 +17,17 @@ app.use(express.json({ limit: '50mb' }));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const VERTEX_API_KEY = process.env.VERTEX_AI_API_KEY;
+const GOOGLE_CLOUD_PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
+
+// Configurar autenticación de Google para Vertex AI
+// En Render, usar Service Account Key desde variable de entorno
+const auth = new GoogleAuth({
+    scopes: 'https://www.googleapis.com/auth/cloud-platform',
+    // En Render, configurar GOOGLE_APPLICATION_CREDENTIALS_JSON como variable de entorno
+    credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ? 
+        JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) : undefined
+});
+
 
 // Sistema de tracking de uso por usuario
 const userUsage = new Map(); // Formato: userId -> { totalUsed: count, isPremium: boolean, registrationDate: date }
@@ -31,8 +43,8 @@ function getUserLimits(userId, isPremium = false) {
     }
     
     const userData = userUsage.get(userId);
-    const freeLimitTotal = 5;      // 5 generaciones gratis TOTALES (para siempre)
-    const premiumLimitDaily = 10;  // 10 generaciones premium por día (rentable)
+    const freeLimitTotal = 5;        // 5 generaciones gratis TOTALES para siempre
+    const premiumLimitDaily = 10;    // 10 generaciones diarias para usuarios premium
     
     if (isPremium) {
         // Para premium: límite diario que se resetea
@@ -158,55 +170,78 @@ app.post('/api/generate', async (req, res) => {
     const imageQuality = req.body.imageQuality || 'fast'; // 'fast', 'standard', 'ultra'
     
     let model, apiUrl, isVertexAI = false;
-
-    if (hasImage) {
-        // Para imágenes: usar Vertex AI Imagen (más barato - $0.02 vs $0.039)
-        if (VERTEX_API_KEY) {
-            isVertexAI = true;
-            switch(imageQuality) {
-                case 'ultra':
-                    model = 'imagen-4.0-ultra-generate-001'; // $0.06
-                    break;
-                case 'standard':
-                    model = 'imagen-4.0-generate-001'; // $0.04
-                    break;
-                case 'fast':
-                default:
-                    model = 'imagen-4.0-fast-generate-001'; // $0.02
-                    break;
-            }
-        } else {
-            // Fallback a Gemini si no hay Vertex API Key
-            model = 'gemini-2.0-flash';
-            isVertexAI = false;
+    let headers; // Declarar headers aquí para que esté disponible en todo el scope
+    console.log(`[API SELECTION] hasImage: ${hasImage}, VERTEX_API_KEY available: ${!!VERTEX_API_KEY}`);
+    
+    // Para imágenes o cuando se especifica calidad, se debe usar Vertex AI.
+    if (hasImage || req.body.imageQuality) {
+        if (!GOOGLE_CLOUD_PROJECT_ID) {
+            return res.status(500).json({ error: { message: 'La generación de imágenes requiere GOOGLE_CLOUD_PROJECT_ID en el servidor.' }});
         }
-    } else {
-        // Para texto: usar Gemini (gratuito)
-        model = 'gemini-2.0-flash-lite';
-    }
+        isVertexAI = true;
+        model = 'imagegeneration@006'; // Modelo de Imagen 2 recomendado para Vertex AI
+        const location = "us-central1";
+        
+        // Obtener el token de acceso para Vertex AI
+        const client = await auth.getClient();
+        const accessToken = (await client.getAccessToken()).token;
 
-    if (isVertexAI) {
-        // Usar Vertex AI para generación de imágenes
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${VERTEX_API_KEY}`;
+        apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${location}/publishers/google/models/${model}:predict`;
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}` // Usar el token de acceso real
+        };
+        console.log(`[API SELECTION] Usando Vertex AI para imágenes: ${model}`);
     } else {
-        // Usar Gemini API
+        // Para texto (reescribir prompt): usar Gemini API
+        if (!GEMINI_API_KEY) {
+            return res.status(500).json({ error: { message: 'La generación de texto requiere GEMINI_API_KEY en el servidor.' } });
+        }
+        isVertexAI = false;
+        model = 'gemini-1.5-flash-latest';
         apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+        headers = {
+            'Content-Type': 'application/json'
+        };
+        console.log(`[API SELECTION] Usando Gemini API para texto: ${model}`);
     }
     console.log(`[PROXY] Generando contenido con el modelo: ${model}`);
 
     try {
+        let apiRequestBody;
+
+        if (isVertexAI) {
+            // Vertex AI tiene un formato de body específico para 'imagegeneration'
+            const promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
+            apiRequestBody = {
+                "instances": [{
+                    "prompt": promptText
+                }],
+                "parameters": {
+                    "sampleCount": 1 // Generar 1 imagen
+                }
+            };
+        } else {
+            // Gemini API usa el formato 'contents'
+            apiRequestBody = {
+                contents: req.body.contents,
+                generationConfig: req.body.generationConfig,
+                safetySettings: req.body.safetySettings
+            };
+        }
+        console.log(`[DEBUG] Enviando request a: ${apiUrl}`);
+
         const response = await fetch(apiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(req.body), // Reenviar el payload del cliente
+            headers: headers,
+            body: JSON.stringify(apiRequestBody),
         });
 
         // Reenviar Respuesta y Errores de Google
         const data = await response.json();
 
         if (!response.ok) {
+            console.error('Error de la API de Google:', data);
             // Reenviar el error de Google al cliente con el código de estado correcto
             return res.status(response.status).json(data);
         }
@@ -214,10 +249,30 @@ app.post('/api/generate', async (req, res) => {
         // Incrementar contador solo si la generación fue exitosa
         incrementUsage(userId, isPremium);
         
+        // Adaptar la respuesta de Vertex AI al formato esperado por el frontend
+        let finalResponseData = data;
+        if (isVertexAI) {
+            if (data.predictions && data.predictions[0].bytesBase64Encoded) {
+                finalResponseData = {
+                    candidates: [{
+                        content: {
+                            parts: [{
+                                inlineData: {
+                                    mimeType: 'image/png',
+                                    data: data.predictions[0].bytesBase64Encoded
+                                }
+                            }]
+                        },
+                        finishReason: 'STOP'
+                    }]
+                };
+            }
+        }
+
         // Agregar información de límites a la respuesta
         const updatedLimits = getUserLimits(userId, isPremium);
         const responseWithLimits = {
-            ...data,
+            ...finalResponseData,
             usage: {
                 used: updatedLimits.used,
                 remaining: updatedLimits.remaining,
@@ -246,7 +301,6 @@ app.get('/api/limits/:userId', (req, res) => {
         resetTime: new Date(new Date().setHours(24, 0, 0, 0)).toISOString() // Medianoche del próximo día
     });
 });
-
 // Endpoint para resetear límites de usuario (desarrollo/testing)
 app.post('/api/reset-limits/:userId', (req, res) => {
     const { userId } = req.params;
@@ -264,6 +318,15 @@ app.post('/api/reset-limits/:userId', (req, res) => {
         success: true,
         message: `Límites reseteados para usuario ${userId}`,
         limits: newLimits
+    });
+});
+
+// Endpoint para limpiar TODOS los datos (testing)
+app.post('/api/debug/clear-all', (req, res) => {
+    userUsage.clear(); // Limpiar todo el mapa de usuarios
+    res.json({
+        success: true,
+        message: 'Todos los datos de usuarios han sido limpiados'
     });
 });
 
