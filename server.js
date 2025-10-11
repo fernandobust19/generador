@@ -15,8 +15,6 @@ const port = process.env.PORT || 3000;
 // Middleware para parsear JSON (con un límite mayor para las imágenes). Debe ir ANTES de las rutas que lo usan.
 app.use(express.json({ limit: '50mb' }));
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const VERTEX_API_KEY = process.env.VERTEX_AI_API_KEY;
 const GOOGLE_CLOUD_PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 
 // Configurar autenticación de Google para Vertex AI
@@ -142,8 +140,9 @@ try {
 
 // Endpoint que recibirá las peticiones desde tu página web
 app.post('/api/generate', async (req, res) => {
-    if (!GEMINI_API_KEY && !VERTEX_API_KEY) {
-        return res.status(500).json({ error: { message: 'No hay API Keys configuradas en el servidor.' } });
+    // Requerimos al menos el ID de proyecto para usar Vertex AI
+    if (!GOOGLE_CLOUD_PROJECT_ID) {
+        return res.status(500).json({ error: { message: 'Falta GOOGLE_CLOUD_PROJECT_ID para usar Vertex AI.' } });
     }
 
     // Control de límites por usuario
@@ -164,72 +163,44 @@ app.post('/api/generate', async (req, res) => {
         });
     }
 
-    // Lógica de Selección de Modelo y API
-    // Determinar si el payload contiene datos de imagen (para combinación/edición)
-    const hasImage = req.body.contents?.[0]?.parts?.some(part => part.inlineData);
     // Selección de calidad con tope de costo por generación (ahora $0.06 para permitir 'ultra')
     const hasQualityParam = typeof req.body.imageQuality === 'string';
-    const requestedQuality = hasQualityParam ? String(req.body.imageQuality).toLowerCase() : null;
+    const requestedQuality = hasQualityParam ? String(req.body.imageQuality).toLowerCase() : 'standard';
     const priceByQuality = { fast: 0.02, standard: 0.04, ultra: 0.06 };
     const budgetPerGeneration = 0.06;
-    let selectedQuality = null;
-    if (hasQualityParam) {
-        selectedQuality = requestedQuality || 'ultra';
-        if (!priceByQuality[selectedQuality] || priceByQuality[selectedQuality] > budgetPerGeneration) {
-            // Elegir la mejor calidad dentro del presupuesto (ultra si está ≤ presupuesto, si no standard, si no fast)
-            if (priceByQuality.ultra <= budgetPerGeneration) selectedQuality = 'ultra';
-            else if (priceByQuality.standard <= budgetPerGeneration) selectedQuality = 'standard';
-            else selectedQuality = 'fast';
-            console.log(`[QUALITY] Solicitada: ${requestedQuality} -> Aplicada: ${selectedQuality} (tope $${budgetPerGeneration.toFixed(2)})`);
-        }
+    let selectedQuality = requestedQuality;
+    if (!priceByQuality[selectedQuality] || priceByQuality[selectedQuality] > budgetPerGeneration) {
+        // Elegir la mejor calidad dentro del presupuesto (ultra si está ≤ presupuesto, si no standard, si no fast)
+        if (priceByQuality.ultra <= budgetPerGeneration) selectedQuality = 'ultra';
+        else if (priceByQuality.standard <= budgetPerGeneration) selectedQuality = 'standard';
+        else selectedQuality = 'fast';
+        console.log(`[QUALITY] Solicitada: ${requestedQuality} -> Aplicada: ${selectedQuality} (tope $${budgetPerGeneration.toFixed(2)})`);
     }
-    
-    let model, apiUrl, isVertexAI = false;
-    let headers; // Declarar headers aquí para que esté disponible en todo el scope
-    console.log(`[API SELECTION] hasImage: ${hasImage}, VERTEX_API_KEY available: ${!!VERTEX_API_KEY}`);
-    
-    // Para imágenes o cuando se especifica calidad, se debe usar Vertex AI.
-    // Usar Vertex AI sólo cuando hay imagen o cuando el cliente especifica calidad explícitamente
-    if (hasImage || hasQualityParam) {
-        if (!GOOGLE_CLOUD_PROJECT_ID) {
-            return res.status(500).json({ error: { message: 'La generación de imágenes requiere GOOGLE_CLOUD_PROJECT_ID en el servidor.' }});
-        }
-        isVertexAI = true;
-        model = 'imagen-3.0-generate-001'; // Modelo más accesible para Vertex AI
-        const location = "us-central1";
-        
-        try {
-            // Obtener el token de acceso para Vertex AI
-            const client = await auth.getClient();
-            const accessToken = (await client.getAccessToken()).token;
 
-            apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${location}/publishers/google/models/${model}:predict`;
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}` // Usar el token de acceso real
-            };
-            console.log(`[API SELECTION] Usando Vertex AI para imágenes: ${model}`);
-        } catch (authError) {
-            console.error('Error de autenticación con Vertex AI:', authError.message);
-            return res.status(401).json({ 
-                error: { 
-                    message: 'Error de autenticación con Vertex AI. Verifica las credenciales.',
-                    details: authError.message
-                } 
-            });
-        }
-    } else {
-        // Para texto (reescribir prompt): usar Gemini API
-        if (!GEMINI_API_KEY) {
-            return res.status(500).json({ error: { message: 'La generación de texto requiere GEMINI_API_KEY en el servidor.' } });
-        }
-        isVertexAI = false;
-        model = 'gemini-1.5-flash-latest';
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    // Forzar Vertex AI para toda generación (texto→imagen o edición)
+    let model = 'imagen-3.0-generate-001';
+    const location = 'us-central1';
+    let apiUrl, headers;
+    let isVertexAI = true;
+    try {
+        // Obtener el token de acceso para Vertex AI
+        const client = await auth.getClient();
+        const accessToken = (await client.getAccessToken()).token;
+
+        apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${location}/publishers/google/models/${model}:predict`;
         headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}` // Usar el token de acceso real
         };
-        console.log(`[API SELECTION] Usando Gemini API para texto: ${model}`);
+        console.log(`[API] Usando Vertex AI para generación de imágenes: ${model}`);
+    } catch (authError) {
+        console.error('Error de autenticación con Vertex AI:', authError.message);
+        return res.status(401).json({ 
+            error: { 
+                message: 'Error de autenticación con Vertex AI. Verifica las credenciales.',
+                details: authError.message
+            } 
+        });
     }
     console.log(`[PROXY] Generando contenido con el modelo: ${model}`);
 
@@ -238,11 +209,16 @@ app.post('/api/generate', async (req, res) => {
 
         if (isVertexAI) {
             // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
-            let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
-            // Mejorar calidad según la selección aplicada con presupuesto (por defecto 'ultra' si no se pudo determinar)
-            const qualityLevel = selectedQuality || 'ultra';
-            // Contexto base (ES) para mejorar coherencia/calidad en niveles altos
-            const qualityContext = `Eres un generador de imágenes enfocado en calidad fotográfica, realismo anatómico y consistencia visual.
+            let promptText = req.body.contents?.[0]?.parts?.find(p => p.text)?.text || '';
+            // Mejorar calidad según la selección aplicada con presupuesto (por defecto 'standard')
+            const qualityLevel = selectedQuality || 'standard';
+
+            // Detección simple de retratos/personas para activar refuerzos anti-deformaciones faciales
+            const faceKeywords = /(cara|rostro|retrato|selfie|headshot|perfil|primer\s*plano|persona|hombre|mujer|niñ[oa]|face|portrait|head\s*shot)/i;
+            const isPortraitLike = faceKeywords.test(promptText);
+
+            // Contexto base (ES) para mejorar coherencia/calidad general
+            const baseContext = `Eres un generador de imágenes enfocado en calidad fotográfica, realismo anatómico y consistencia visual.
 Mantén los rasgos faciales, ropa y entorno iguales entre generaciones.
 Evita deformaciones, duplicación de extremidades o inconsistencias.
 Cuando se edite una imagen, toma como base la versión más reciente.
@@ -250,15 +226,22 @@ Integra overlays o imágenes flotantes con luz y perspectiva naturales.
 Usa composición profesional, iluminación realista y fondo limpio.
 Prohíbe texto visible, logos o marcas.
 Preserva proporciones humanas reales y evita artefactos visuales.`;
+
+            // Refuerzo de retrato para evitar deformaciones en rostro y ojos
+            const portraitContext = isPortraitLike ? `
+Enfócate en un rostro simétrico y natural: ojos bien alineados y centrados, iris y pupilas redondas, mirada realista, dientes naturales sin exceso, boca proporcionada, nariz y orejas con forma correcta. Piel con textura natural (sin efecto plástico o encerado), poros sutiles, tonos realistas y sin sobrealisado. Mantén proporciones faciales correctas (tercios faciales) y evita cualquier distorsión de ojos o boca. Iluminación suave de retrato tipo estudio (lente equivalente 85mm).` : '';
+
             const qualitySuffixMap = {
                 fast: '',
                 standard: ' Renderiza con alto nivel de detalle, enfoque nítido, iluminación realista, texturas naturales, anatomía correcta y composición limpia.',
                 ultra: ' Ultra detallada, alta resolución, fotorrealista, iluminación cinematográfica, textura de piel natural, anatomía correcta, enfoque nítido, alto rango dinámico y composición limpia.'
             };
             const qualitySuffix = qualitySuffixMap[qualityLevel] || '';
-            if (qualitySuffix) {
-                // Prepend contexto y añadir sufijo de calidad
-                promptText = `${qualityContext}\n\n${promptText}\n${qualitySuffix}`.trim();
+
+            // Construir prompt mejorado
+            const mergedContext = [baseContext, portraitContext].filter(Boolean).join('\n\n');
+            if (qualitySuffix || mergedContext) {
+                promptText = `${mergedContext}\n\n${promptText}\n${qualitySuffix}`.trim();
             }
             // Detectar si viene una imagen inline desde el frontend
             const inlineImagePart = req.body.contents?.[0]?.parts?.find(p => p.inlineData);
@@ -273,10 +256,11 @@ Preserva proporciones humanas reales y evita artefactos visuales.`;
                 console.log('[VertexAI] Generación sin imagen adjunta (texto → imagen)');
             }
 
-            // Validar y aplicar relación de aspecto si viene del cliente
+            // Validar y aplicar relación de aspecto. Para retratos, por defecto 3:4 si no viene uno válido.
             const allowedRatios = new Set(['1:1','3:4','4:3','16:9','9:16']);
-            const requestedRatio = (req.body.aspectRatio || '1:1');
-            const appliedRatio = allowedRatios.has(requestedRatio) ? requestedRatio : '1:1';
+            const defaultRatio = isPortraitLike ? '3:4' : '1:1';
+            const requestedRatio = (req.body.aspectRatio || defaultRatio);
+            const appliedRatio = allowedRatios.has(requestedRatio) ? requestedRatio : defaultRatio;
 
             apiRequestBody = {
                 instances: [instance],
@@ -285,16 +269,25 @@ Preserva proporciones humanas reales y evita artefactos visuales.`;
                     aspectRatio: appliedRatio,
                     safetyFilterLevel: 'block_some',
                     personGeneration: 'allow_adult',
-                    // Evitar deformaciones y baja calidad (EN + ES)
-                    negativePrompt: 'blurry, deformed, distorted, asymmetry, extra limbs, extra fingers, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, jpeg artifacts, out of frame, borroso, deformado, distorsionado, asimetría, extremidades extra, dedos extra, mala anatomía, baja calidad, baja resolución, artefactos, marca de agua, texto, logotipo, recortado, fuera de cuadro'
+                    // Evitar deformaciones y baja calidad (EN + ES), con refuerzo específico para rostro cuando aplica
+                    negativePrompt: (function(){
+                        const baseNeg = [
+                            'blurry, low quality, lowres, artifacts, jpeg artifacts, watermark, text, logo, cropped, out of frame',
+                            'deformed, distorted, bad anatomy, wrong proportions, extra limbs, extra fingers',
+                            'borroso, baja calidad, baja resolución, artefactos, marca de agua, texto, logotipo, recortado, fuera de cuadro',
+                            'deformado, distorsionado, mala anatomía, proporciones incorrectas, extremidades extra, dedos extra'
+                        ];
+                        const faceNeg = [
+                            'deformed face, melted face, disfigured, misshapen face, wrong facial proportions, lopsided face',
+                            'asymmetrical eyes, crossed eyes, wonky eyes, misaligned eyes, lazy eye, extra eyes, missing eyes, bad eyes, bad pupils, bad iris',
+                            'distorted mouth, extra teeth, bad teeth, fused lips, malformed nose, deformed ears, waxy skin, plastic skin, over-smoothed skin',
+                            'rostro deformado, cara deformada, desfigurado, proporciones faciales incorrectas, rostro torcido',
+                            'ojos asimétricos, ojos bizcos, ojos desalineados, ojo perezoso, ojos extra, ojos faltantes, pupilas mal formadas, iris mal formados',
+                            'boca deformada, dientes extra, dientes mal formados, labios fusionados, nariz malformada, orejas deformes, piel de cera, piel plástica, piel sobrealisada'
+                        ];
+                        return (isPortraitLike ? baseNeg.concat(faceNeg) : baseNeg).join(', ');
+                    })()
                 }
-            };
-        } else {
-            // Gemini API usa el formato 'contents'
-            apiRequestBody = {
-                contents: req.body.contents,
-                generationConfig: req.body.generationConfig,
-                safetySettings: req.body.safetySettings
             };
         }
         console.log(`[DEBUG] Enviando request a: ${apiUrl}`);
