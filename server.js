@@ -256,11 +256,16 @@ Avoid: blurry, deformed, distorted, asymmetry, extra fingers/limbs, bad anatomy,
                 console.log('[VertexAI] Generación sin imagen adjunta (texto → imagen)');
             }
 
+            // Validar y aplicar relación de aspecto si viene del cliente
+            const allowedRatios = new Set(['1:1','3:4','4:3','16:9','9:16']);
+            const requestedRatio = (req.body.aspectRatio || '1:1');
+            const appliedRatio = allowedRatios.has(requestedRatio) ? requestedRatio : '1:1';
+
             apiRequestBody = {
                 instances: [instance],
                 parameters: {
                     sampleCount: 1, // Generar 1 imagen
-                    aspectRatio: '1:1',
+                    aspectRatio: appliedRatio,
                     safetyFilterLevel: 'block_some',
                     personGeneration: 'allow_adult',
                     // Evitar deformaciones y baja calidad

@@ -468,13 +468,24 @@
                 </button>
             </div>
             
-            <!-- Selector de Calidad (solo para usuarios premium) -->
-            <div id="quality-selector" class="hidden w-full sm:w-auto">
-                <select id="image-quality" class="styled-button bg-gray-800 border-gray-600 text-gray-300 py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg">
-                    <option value="fast">🚀 Rápida ($0.02)</option>
-                    <option value="standard">⭐ Estándar ($0.04)</option>
-                    <option value="ultra">💎 Ultra ($0.06)</option>
-                </select>
+            <!-- Selector de Calidad y Aspect Ratio (solo para usuarios premium) -->
+            <div class="hidden w-full sm:w-auto gap-2 sm:flex">
+                <div id="quality-selector">
+                    <select id="image-quality" class="styled-button bg-gray-800 border-gray-600 text-gray-300 py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg">
+                        <option value="standard" selected>⭐ Estándar</option>
+                        <option value="fast">🚀 Rápida</option>
+                        <option value="ultra">💎 Ultra</option>
+                    </select>
+                </div>
+                <div id="ratio-selector">
+                    <select id="aspect-ratio" class="styled-button bg-gray-800 border-gray-600 text-gray-300 py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg">
+                        <option value="1:1" selected>1:1</option>
+                        <option value="3:4">3:4</option>
+                        <option value="4:3">4:3</option>
+                        <option value="16:9">16:9</option>
+                        <option value="9:16">9:16</option>
+                    </select>
+                </div>
             </div>
             
             <button id="generate-btn" class="styled-button btn-primary py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg sm:rounded-md whitespace-nowrap w-full sm:w-auto">
@@ -1175,12 +1186,14 @@
                 images.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }));
                 if (mask) parts.push({ inlineData: { mimeType: mask.mimeType, data: mask.data } });
                 
-                // Obtener calidad de imagen seleccionada
-                const imageQuality = document.getElementById('image-quality')?.value || 'fast';
+                // Obtener calidad de imagen y relación de aspecto seleccionadas
+                const imageQuality = document.getElementById('image-quality')?.value || 'standard';
+                const aspectRatio = document.getElementById('aspect-ratio')?.value || '1:1';
                 
                 const payload = { 
                     contents: [{ parts }],
-                    imageQuality: imageQuality
+                    imageQuality: imageQuality,
+                    aspectRatio: aspectRatio
                 };
 
                 const result = await callApiWithBackoff(apiUrl, payload);
