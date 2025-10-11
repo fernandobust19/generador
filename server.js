@@ -225,18 +225,19 @@ app.post('/api/generate', async (req, res) => {
             let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
             // Mejorar calidad según la selección del cliente
             const qualityLevel = (req.body.imageQuality || 'fast').toLowerCase();
-            // Contexto base para mejorar coherencia/calidad en niveles altos
-            const qualityContext = `You are generating a single professional-quality image with:
-- clean composition (rule of thirds or centered when appropriate)
-- realistic lighting and natural shadows
-- sharp focus, correct anatomy and proportions
-- natural textures and balanced colors
-- uncluttered background without unnecessary elements
-Avoid: blurry, deformed, distorted, asymmetry, extra fingers/limbs, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, out of frame.`;
+            // Contexto base (ES) para mejorar coherencia/calidad en niveles altos
+            const qualityContext = `Eres un generador de imágenes enfocado en calidad fotográfica, realismo anatómico y consistencia visual.
+Mantén los rasgos faciales, ropa y entorno iguales entre generaciones.
+Evita deformaciones, duplicación de extremidades o inconsistencias.
+Cuando se edite una imagen, toma como base la versión más reciente.
+Integra overlays o imágenes flotantes con luz y perspectiva naturales.
+Usa composición profesional, iluminación realista y fondo limpio.
+Prohíbe texto visible, logos o marcas.
+Preserva proporciones humanas reales y evita artefactos visuales.`;
             const qualitySuffixMap = {
                 fast: '',
-                standard: ' Render with high detail, sharp focus, realistic lighting, natural textures, correct anatomy, clean composition.',
-                ultra: ' Ultra-detailed, high resolution, photorealistic, cinematic lighting, natural skin texture, correct anatomy, sharp focus, high dynamic range, clean composition.'
+                standard: ' Renderiza con alto nivel de detalle, enfoque nítido, iluminación realista, texturas naturales, anatomía correcta y composición limpia.',
+                ultra: ' Ultra detallada, alta resolución, fotorrealista, iluminación cinematográfica, textura de piel natural, anatomía correcta, enfoque nítido, alto rango dinámico y composición limpia.'
             };
             const qualitySuffix = qualitySuffixMap[qualityLevel] || '';
             if (qualitySuffix) {
@@ -268,8 +269,8 @@ Avoid: blurry, deformed, distorted, asymmetry, extra fingers/limbs, bad anatomy,
                     aspectRatio: appliedRatio,
                     safetyFilterLevel: 'block_some',
                     personGeneration: 'allow_adult',
-                    // Evitar deformaciones y baja calidad
-                    negativePrompt: 'blurry, deformed, distorted, asymmetry, extra limbs, extra fingers, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, jpeg artifacts, out of frame'
+                    // Evitar deformaciones y baja calidad (EN + ES)
+                    negativePrompt: 'blurry, deformed, distorted, asymmetry, extra limbs, extra fingers, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, jpeg artifacts, out of frame, borroso, deformado, distorsionado, asimetría, extremidades extra, dedos extra, mala anatomía, baja calidad, baja resolución, artefactos, marca de agua, texto, logotipo, recortado, fuera de cuadro'
                 }
             };
         } else {
