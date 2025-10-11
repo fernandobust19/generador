@@ -1198,7 +1198,7 @@
             if (generatedImagesHistory.length === 0) return showError('No hay imagen para editar.');
 
             const currentImage = generatedImagesHistory[currentImageIndex];
-            const [header, base64Data] = currentImage.split(',');
+            const [header, base64Data] = currentImage.url.split(',');
             const mimeType = header.match(/:(.*?);/)[1];
             const imageData = { mimeType, data: base64Data };
             
@@ -1245,7 +1245,7 @@
 
             // Get base image
             const currentImage = generatedImagesHistory[currentImageIndex];
-            const [header, base64Data] = currentImage.split(',');
+            const [header, base64Data] = currentImage.url.split(',');
             const baseImage = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
 
             // Get overlay image and its transformations
@@ -1391,7 +1391,7 @@
         saveBtn.addEventListener('click', () => {
             if (generatedImagesHistory.length > 0) {
                  const link = document.createElement('a');
-                 link.href = generatedImagesHistory[currentImageIndex];
+                 link.href = generatedImagesHistory[currentImageIndex].url;
                  link.download = `imagen-generada-${currentImageIndex + 1}.png`;
                  link.click();
             }
@@ -1508,7 +1508,7 @@
 
         async function performInpaint(prompt, maskData) {
             const currentImage = generatedImagesHistory[currentImageIndex];
-            const [header, base64Data] = currentImage.split(',');
+            const [header, base64Data] = currentImage.url.split(',');
             const imageData = { mimeType: header.match(/:(.*?);/)[1], data: base64Data };
             
             await handleImageGeneration(prompt, [imageData], { mask: maskData });

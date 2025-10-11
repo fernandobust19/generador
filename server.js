@@ -22,7 +22,10 @@ const GOOGLE_CLOUD_PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 // Configurar autenticación de Google para Vertex AI
 // En Render, usar Service Account Key desde variable de entorno
 const auth = new GoogleAuth({
-    scopes: 'https://www.googleapis.com/auth/cloud-platform',
+    scopes: [
+        'https://www.googleapis.com/auth/cloud-platform',
+        'https://www.googleapis.com/auth/aiplatform'
+    ],
     // En Render, configurar GOOGLE_APPLICATION_CREDENTIALS_JSON como variable de entorno
     credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ? 
         JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) : undefined
@@ -179,19 +182,29 @@ app.post('/api/generate', async (req, res) => {
             return res.status(500).json({ error: { message: 'La generación de imágenes requiere GOOGLE_CLOUD_PROJECT_ID en el servidor.' }});
         }
         isVertexAI = true;
-        model = 'imagegeneration@006'; // Modelo de Imagen 2 recomendado para Vertex AI
+        model = 'imagen-3.0-generate-001'; // Modelo más accesible para Vertex AI
         const location = "us-central1";
         
-        // Obtener el token de acceso para Vertex AI
-        const client = await auth.getClient();
-        const accessToken = (await client.getAccessToken()).token;
+        try {
+            // Obtener el token de acceso para Vertex AI
+            const client = await auth.getClient();
+            const accessToken = (await client.getAccessToken()).token;
 
-        apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${location}/publishers/google/models/${model}:predict`;
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}` // Usar el token de acceso real
-        };
-        console.log(`[API SELECTION] Usando Vertex AI para imágenes: ${model}`);
+            apiUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT_ID}/locations/${location}/publishers/google/models/${model}:predict`;
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}` // Usar el token de acceso real
+            };
+            console.log(`[API SELECTION] Usando Vertex AI para imágenes: ${model}`);
+        } catch (authError) {
+            console.error('Error de autenticación con Vertex AI:', authError);
+            return res.status(401).json({ 
+                error: { 
+                    message: 'Error de autenticación con Vertex AI. Verifica las credenciales.',
+                    details: authError.message
+                } 
+            });
+        }
     } else {
         // Para texto (reescribir prompt): usar Gemini API
         if (!GEMINI_API_KEY) {
@@ -211,14 +224,20 @@ app.post('/api/generate', async (req, res) => {
         let apiRequestBody;
 
         if (isVertexAI) {
-            // Vertex AI tiene un formato de body específico para 'imagegeneration'
+            // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
             const promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
             apiRequestBody = {
                 "instances": [{
-                    "prompt": promptText
+                    "prompt": promptText,
+                    "image": {
+                        "bytesBase64Encoded": ""
+                    }
                 }],
                 "parameters": {
-                    "sampleCount": 1 // Generar 1 imagen
+                    "sampleCount": 1, // Generar 1 imagen
+                    "aspectRatio": "1:1",
+                    "safetyFilterLevel": "block_some",
+                    "personGeneration": "allow_adult"
                 }
             };
         } else {
@@ -252,20 +271,34 @@ app.post('/api/generate', async (req, res) => {
         // Adaptar la respuesta de Vertex AI al formato esperado por el frontend
         let finalResponseData = data;
         if (isVertexAI) {
-            if (data.predictions && data.predictions[0].bytesBase64Encoded) {
-                finalResponseData = {
-                    candidates: [{
-                        content: {
-                            parts: [{
-                                inlineData: {
-                                    mimeType: 'image/png',
-                                    data: data.predictions[0].bytesBase64Encoded
-                                }
-                            }]
-                        },
-                        finishReason: 'STOP'
-                    }]
-                };
+            if (data.predictions && data.predictions[0]) {
+                // Para imagen-3.0-generate-001, la respuesta puede tener diferentes estructuras
+                const prediction = data.predictions[0];
+                let imageData = null;
+                
+                if (prediction.bytesBase64Encoded) {
+                    imageData = prediction.bytesBase64Encoded;
+                } else if (prediction.image && prediction.image.bytesBase64Encoded) {
+                    imageData = prediction.image.bytesBase64Encoded;
+                } else if (prediction.generatedImage) {
+                    imageData = prediction.generatedImage;
+                }
+                
+                if (imageData) {
+                    finalResponseData = {
+                        candidates: [{
+                            content: {
+                                parts: [{
+                                    inlineData: {
+                                        mimeType: 'image/png',
+                                        data: imageData
+                                    }
+                                }]
+                            },
+                            finishReason: 'STOP'
+                        }]
+                    };
+                }
             }
         }
 
