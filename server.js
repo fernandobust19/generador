@@ -97,7 +97,7 @@ try {
         stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
         console.log('✅ Stripe configurado correctamente');
     } else {
-        console.log('⚠️ STRIPE_SECRET_KEY no encontrada - funciones de pago deshabilitadas');
+        // Stripe no configurado: funciones de pago por Stripe deshabilitadas
     }
 } catch (error) {
     console.log('⚠️ Stripe no instalado - funciones de pago deshabilitadas');
@@ -222,7 +222,18 @@ app.post('/api/generate', async (req, res) => {
 
         if (isVertexAI) {
             // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
-            const promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
+            let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
+            // Mejorar calidad según la selección del cliente
+            const qualityLevel = (req.body.imageQuality || 'fast').toLowerCase();
+            const qualitySuffixMap = {
+                fast: '',
+                standard: ' Render with high detail, sharp focus, realistic lighting, natural textures, correct anatomy, clean composition.',
+                ultra: ' Ultra-detailed, high resolution, photorealistic, cinematic lighting, natural skin texture, correct anatomy, sharp focus, high dynamic range, clean composition.'
+            };
+            const qualitySuffix = qualitySuffixMap[qualityLevel] || '';
+            if (qualitySuffix) {
+                promptText = `${promptText}\n${qualitySuffix}`.trim();
+            }
             // Detectar si viene una imagen inline desde el frontend
             const inlineImagePart = req.body.contents?.[0]?.parts?.find(p => p.inlineData);
             const imageBase64 = inlineImagePart?.inlineData?.data;
@@ -242,7 +253,9 @@ app.post('/api/generate', async (req, res) => {
                     sampleCount: 1, // Generar 1 imagen
                     aspectRatio: '1:1',
                     safetyFilterLevel: 'block_some',
-                    personGeneration: 'allow_adult'
+                    personGeneration: 'allow_adult',
+                    // Evitar deformaciones y baja calidad
+                    negativePrompt: 'blurry, deformed, distorted, asymmetry, extra limbs, extra fingers, bad anatomy, low quality, lowres, artifacts, watermark, text, logo, cropped, jpeg artifacts, out of frame'
                 }
             };
         } else {

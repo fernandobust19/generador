@@ -55,7 +55,6 @@
             -o-user-select: none;
             user-select: none;
             pointer-events: none;
-            draggable: false;
         }
         
         /* Desactivar menú contextual para imágenes con marca de agua */
@@ -784,8 +783,10 @@
         let lastPos = { x: 0, y: 0 };
 
         // --- Plan & Limits System (Server-Side) ---
-        let userPlan = 'free';
-        let userId = null;
+    let userPlan = 'free';
+    let userId = null;
+    // Mantener los límites actuales reportados por el servidor para lógica de UI
+    let currentLimits = null;
 
         function getUserId() {
             if (!userId) {
@@ -815,6 +816,8 @@
         }
 
         function updatePlanUI(limits) {
+            // Guardar límites actuales para condicionar mensajes en la UI
+            currentLimits = limits || currentLimits;
             const isPremium = checkPremiumStatus();
             if (isPremium) {
                 planBadge.textContent = 'PREMIUM';
@@ -943,18 +946,51 @@
         });
         
         async function startCamera() {
-            const rearCameraConstraints = { video: { facingMode: { ideal: 'environment' } } };
-            const frontCameraConstraints = { video: { facingMode: 'user' } };
-            
+            // Verificaciones básicas de soporte y contexto seguro
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Tu navegador no soporta acceso a la cámara. Prueba con Chrome/Edge/Firefox actualizados.');
+                return;
+            }
+            const isSecure = location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname);
+            if (!isSecure) {
+                showError('La cámara requiere HTTPS. Abre la app con https:// o ejecútala en localhost.');
+                return;
+            }
+
+            // Detener cualquier stream previo antes de iniciar uno nuevo
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+            }
+
+            const envConstraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+            const userConstraints = { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+
+            // Intentar primero cámara trasera (móvil), luego frontal
             try {
-                cameraStream = await navigator.mediaDevices.getUserMedia(rearCameraConstraints);
+                cameraStream = await navigator.mediaDevices.getUserMedia(envConstraints);
                 video.style.transform = 'scaleX(1)';
             } catch (err) {
+                // Si fue denegado, mostrar guía específica
+                if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+                    showError('Permiso de cámara denegado. Dale clic al candado de la barra de direcciones y permite el acceso.');
+                    return;
+                }
+                // Si no hay cámara trasera, probar con frontal
                 try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia(frontCameraConstraints);
+                    cameraStream = await navigator.mediaDevices.getUserMedia(userConstraints);
+                    // Espejar para modo selfie
                     video.style.transform = 'scaleX(-1)';
                 } catch (fallbackErr) {
-                    showError("No se pudo acceder a la cámara. Revisa los permisos.");
+                    let msg = 'No se pudo acceder a la cámara.';
+                    if (fallbackErr && (fallbackErr.name === 'NotFoundError' || fallbackErr.name === 'OverconstrainedError')) {
+                        msg += ' No se detectó un dispositivo de cámara disponible.';
+                    } else if (fallbackErr && fallbackErr.name === 'NotReadableError') {
+                        msg += ' Otra aplicación podría estar usando la cámara. Ciérrala e inténtalo de nuevo.';
+                    } else {
+                        msg += ' Revisa los permisos del sitio y vuelve a intentar.';
+                    }
+                    showError(msg);
                     stopCamera();
                     return;
                 }
@@ -1288,12 +1324,17 @@
             
             // Agregar marca de agua para usuarios gratuitos
             if (isWatermarked) {
+                // Sólo mostrar el aviso de "Actualiza a Premium" cuando se hayan agotado las 10 gratuitas
+                const showNag = currentLimits && (currentLimits.remaining !== undefined)
+                    ? (currentLimits.remaining <= 0)
+                    : false;
                 slideContent += `
+                    ${showNag ? `
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div class="bg-black/30 text-white px-6 py-3 rounded-lg text-base font-semibold opacity-70 text-center">
                             ⚡ ACTUALIZA A PREMIUM PARA DESCARGAR
                         </div>
-                    </div>
+                    </div>` : ''}
                     <div class="absolute top-2 right-2 bg-red-500/70 text-white px-2 py-1 rounded text-xs font-bold opacity-60">
                         VERSIÓN DEMO
                     </div>
@@ -1325,8 +1366,8 @@
             overlaySection.classList.toggle('hidden', !hasImages && !isDrawingMode);
             saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2 || !isPremium);
             
-            // Mostrar mensaje especial para usuarios gratuitos con imágenes
-            if (hasImages && !isPremium) {
+            // Mostrar mensaje especial sólo cuando ya no queden generaciones gratis
+            if (hasImages && !isPremium && currentLimits && currentLimits.remaining <= 0) {
                 showError('👑 Imágenes generadas exitosamente. ¡Actualiza a Premium para descargar sin marca de agua!');
                 setTimeout(() => {
                     document.getElementById('pricing-modal').classList.remove('hidden');
