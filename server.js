@@ -167,15 +167,21 @@ app.post('/api/generate', async (req, res) => {
     // Lógica de Selección de Modelo y API
     // Determinar si el payload contiene datos de imagen (para combinación/edición)
     const hasImage = req.body.contents?.[0]?.parts?.some(part => part.inlineData);
-    // Selección de calidad con tope de costo por generación ($0.04)
-    const requestedQuality = (req.body.imageQuality || 'standard').toLowerCase();
+    // Selección de calidad con tope de costo por generación (ahora $0.06 para permitir 'ultra')
+    const hasQualityParam = typeof req.body.imageQuality === 'string';
+    const requestedQuality = hasQualityParam ? String(req.body.imageQuality).toLowerCase() : null;
     const priceByQuality = { fast: 0.02, standard: 0.04, ultra: 0.06 };
-    const budgetPerGeneration = 0.04;
-    let selectedQuality = requestedQuality;
-    if (!priceByQuality[selectedQuality] || priceByQuality[selectedQuality] > budgetPerGeneration) {
-        // Elegir la mejor calidad dentro del presupuesto (standard si está disponible, si no fast)
-        selectedQuality = priceByQuality.standard <= budgetPerGeneration ? 'standard' : 'fast';
-        console.log(`[QUALITY] Solicitada: ${requestedQuality} -> Aplicada: ${selectedQuality} (tope $${budgetPerGeneration.toFixed(2)})`);
+    const budgetPerGeneration = 0.06;
+    let selectedQuality = null;
+    if (hasQualityParam) {
+        selectedQuality = requestedQuality || 'ultra';
+        if (!priceByQuality[selectedQuality] || priceByQuality[selectedQuality] > budgetPerGeneration) {
+            // Elegir la mejor calidad dentro del presupuesto (ultra si está ≤ presupuesto, si no standard, si no fast)
+            if (priceByQuality.ultra <= budgetPerGeneration) selectedQuality = 'ultra';
+            else if (priceByQuality.standard <= budgetPerGeneration) selectedQuality = 'standard';
+            else selectedQuality = 'fast';
+            console.log(`[QUALITY] Solicitada: ${requestedQuality} -> Aplicada: ${selectedQuality} (tope $${budgetPerGeneration.toFixed(2)})`);
+        }
     }
     
     let model, apiUrl, isVertexAI = false;
@@ -183,7 +189,8 @@ app.post('/api/generate', async (req, res) => {
     console.log(`[API SELECTION] hasImage: ${hasImage}, VERTEX_API_KEY available: ${!!VERTEX_API_KEY}`);
     
     // Para imágenes o cuando se especifica calidad, se debe usar Vertex AI.
-    if (hasImage || selectedQuality) {
+    // Usar Vertex AI sólo cuando hay imagen o cuando el cliente especifica calidad explícitamente
+    if (hasImage || hasQualityParam) {
         if (!GOOGLE_CLOUD_PROJECT_ID) {
             return res.status(500).json({ error: { message: 'La generación de imágenes requiere GOOGLE_CLOUD_PROJECT_ID en el servidor.' }});
         }
@@ -232,8 +239,8 @@ app.post('/api/generate', async (req, res) => {
         if (isVertexAI) {
             // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
             let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
-            // Mejorar calidad según la selección aplicada con presupuesto
-            const qualityLevel = selectedQuality;
+            // Mejorar calidad según la selección aplicada con presupuesto (por defecto 'ultra' si no se pudo determinar)
+            const qualityLevel = selectedQuality || 'ultra';
             // Contexto base (ES) para mejorar coherencia/calidad en niveles altos
             const qualityContext = `Eres un generador de imágenes enfocado en calidad fotográfica, realismo anatómico y consistencia visual.
 Mantén los rasgos faciales, ropa y entorno iguales entre generaciones.
@@ -354,7 +361,7 @@ Preserva proporciones humanas reales y evita artefactos visuales.`;
                 limit: updatedLimits.limit,
                 isPremium: isPremium,
                 effectiveQuality: selectedQuality,
-                pricePerGeneration: priceByQuality[selectedQuality] || null
+                pricePerGeneration: selectedQuality ? (priceByQuality[selectedQuality] || null) : null
             }
         };
 
