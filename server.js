@@ -223,18 +223,26 @@ app.post('/api/generate', async (req, res) => {
         if (isVertexAI) {
             // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
             const promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
+            // Detectar si viene una imagen inline desde el frontend
+            const inlineImagePart = req.body.contents?.[0]?.parts?.find(p => p.inlineData);
+            const imageBase64 = inlineImagePart?.inlineData?.data;
+
+            // Construir instancia dinámicamente: sólo incluir 'image' si hay datos válidos
+            const instance = { prompt: promptText };
+            if (typeof imageBase64 === 'string' && imageBase64.trim().length > 0) {
+                instance.image = { bytesBase64Encoded: imageBase64 };
+            } else {
+                // No incluir campo 'image' cuando no se envía una imagen (texto a imagen)
+                console.log('[VertexAI] Generación sin imagen adjunta (texto → imagen)');
+            }
+
             apiRequestBody = {
-                "instances": [{
-                    "prompt": promptText,
-                    "image": {
-                        "bytesBase64Encoded": ""
-                    }
-                }],
-                "parameters": {
-                    "sampleCount": 1, // Generar 1 imagen
-                    "aspectRatio": "1:1",
-                    "safetyFilterLevel": "block_some",
-                    "personGeneration": "allow_adult"
+                instances: [instance],
+                parameters: {
+                    sampleCount: 1, // Generar 1 imagen
+                    aspectRatio: '1:1',
+                    safetyFilterLevel: 'block_some',
+                    personGeneration: 'allow_adult'
                 }
             };
         } else {
