@@ -167,14 +167,23 @@ app.post('/api/generate', async (req, res) => {
     // Lógica de Selección de Modelo y API
     // Determinar si el payload contiene datos de imagen (para combinación/edición)
     const hasImage = req.body.contents?.[0]?.parts?.some(part => part.inlineData);
-    const imageQuality = req.body.imageQuality || 'fast'; // 'fast', 'standard', 'ultra'
+    // Selección de calidad con tope de costo por generación ($0.04)
+    const requestedQuality = (req.body.imageQuality || 'standard').toLowerCase();
+    const priceByQuality = { fast: 0.02, standard: 0.04, ultra: 0.06 };
+    const budgetPerGeneration = 0.04;
+    let selectedQuality = requestedQuality;
+    if (!priceByQuality[selectedQuality] || priceByQuality[selectedQuality] > budgetPerGeneration) {
+        // Elegir la mejor calidad dentro del presupuesto (standard si está disponible, si no fast)
+        selectedQuality = priceByQuality.standard <= budgetPerGeneration ? 'standard' : 'fast';
+        console.log(`[QUALITY] Solicitada: ${requestedQuality} -> Aplicada: ${selectedQuality} (tope $${budgetPerGeneration.toFixed(2)})`);
+    }
     
     let model, apiUrl, isVertexAI = false;
     let headers; // Declarar headers aquí para que esté disponible en todo el scope
     console.log(`[API SELECTION] hasImage: ${hasImage}, VERTEX_API_KEY available: ${!!VERTEX_API_KEY}`);
     
     // Para imágenes o cuando se especifica calidad, se debe usar Vertex AI.
-    if (hasImage || req.body.imageQuality) {
+    if (hasImage || selectedQuality) {
         if (!GOOGLE_CLOUD_PROJECT_ID) {
             return res.status(500).json({ error: { message: 'La generación de imágenes requiere GOOGLE_CLOUD_PROJECT_ID en el servidor.' }});
         }
@@ -223,8 +232,8 @@ app.post('/api/generate', async (req, res) => {
         if (isVertexAI) {
             // Vertex AI tiene un formato de body específico para 'imagen-3.0-generate-001'
             let promptText = req.body.contents[0].parts.find(p => p.text)?.text || '';
-            // Mejorar calidad según la selección del cliente
-            const qualityLevel = (req.body.imageQuality || 'fast').toLowerCase();
+            // Mejorar calidad según la selección aplicada con presupuesto
+            const qualityLevel = selectedQuality;
             // Contexto base (ES) para mejorar coherencia/calidad en niveles altos
             const qualityContext = `Eres un generador de imágenes enfocado en calidad fotográfica, realismo anatómico y consistencia visual.
 Mantén los rasgos faciales, ropa y entorno iguales entre generaciones.
@@ -343,7 +352,9 @@ Preserva proporciones humanas reales y evita artefactos visuales.`;
                 used: updatedLimits.used,
                 remaining: updatedLimits.remaining,
                 limit: updatedLimits.limit,
-                isPremium: isPremium
+                isPremium: isPremium,
+                effectiveQuality: selectedQuality,
+                pricePerGeneration: priceByQuality[selectedQuality] || null
             }
         };
 
