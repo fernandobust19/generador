@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-    <script src="https://js.stripe.com/v3/"></script>
     <script>
         // PayPal SDK will be loaded dynamically based on environment
     </script>
@@ -25,6 +24,38 @@
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
+        }
+        
+        /* Protección anti-captura para usuarios gratuitos */
+        .watermarked-image {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            pointer-events: none;
+        }
+        
+        .watermarked-image img {
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-select: none;
+            -o-user-select: none;
+            user-select: none;
+            pointer-events: none;
+            draggable: false;
+        }
+        
+        /* Desactivar menú contextual para imágenes con marca de agua */
+        .watermarked-image * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            pointer-events: none;
         }
         
         .styled-button {
@@ -426,6 +457,16 @@
                     </svg>
                 </button>
             </div>
+            
+            <!-- Selector de Calidad (solo para usuarios premium) -->
+            <div id="quality-selector" class="hidden w-full sm:w-auto">
+                <select id="image-quality" class="styled-button bg-gray-800 border-gray-600 text-gray-300 py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg">
+                    <option value="fast">🚀 Rápida ($0.02)</option>
+                    <option value="standard">⭐ Estándar ($0.04)</option>
+                    <option value="ultra">💎 Ultra ($0.06)</option>
+                </select>
+            </div>
+            
             <button id="generate-btn" class="styled-button btn-primary py-3 px-4 sm:py-1 sm:px-3 text-sm sm:text-xs rounded-lg sm:rounded-md whitespace-nowrap w-full sm:w-auto">
                 Combinar
             </button>
@@ -555,7 +596,7 @@
                         <span class="text-green-400 font-bold">$0</span>
                     </div>
                     <ul class="text-xs text-gray-300 space-y-1">
-                        <li>✅ 5 generaciones por día</li>
+                        <li>✅ 10 generaciones TOTALES</li>
                         <li>✅ Resolución estándar</li>
                         <li>✅ Todas las herramientas básicas</li>
                         <li>❌ Sin anuncios</li>
@@ -577,8 +618,9 @@
                         </div>
                     </div>
                     <ul class="text-xs text-gray-300 space-y-1">
-                        <li>✅ ∞ Generaciones ilimitadas</li>
-                        <li>✅ Alta resolución</li>
+                        <li>✅ 20 Generaciones/día</li>
+                        <li>✅ Descarga sin marca de agua</li>
+                        <li>✅ 3 calidades disponibles</li>
                         <li>✅ Procesamiento prioritario</li>
                         <li>✅ Sin anuncios</li>
                         <li>✅ Soporte premium</li>
@@ -587,34 +629,29 @@
                 </div>
             </div>
 
+            <!-- Botones principales: Gratis (izquierda) y Premium (derecha) -->
             <div class="flex flex-col sm:flex-row gap-3">
                 <button id="close-pricing-modal" class="flex-1 px-4 py-3 sm:py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition text-sm">
-                    Ahora no
+                    💡 Continuar Gratis
                 </button>
                 <button id="upgrade-to-premium" class="flex-1 px-4 py-3 sm:py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition text-sm">
-                    Actualizar ⚡
+                    ⚡ Premium con PayPal
                 </button>
             </div>
 
-            <!-- Payment Methods Section -->
-            <div class="mt-6 space-y-4" id="payment-methods" style="display: none;">
-                <h3 class="text-center text-lg font-semibold text-white">Elige tu método de pago:</h3>
+            <!-- PayPal Payment Container (se muestra cuando se selecciona Premium) -->
+            <div class="mt-6" id="payment-methods" style="display: none;">
+                <h3 class="text-center text-lg font-semibold text-white mb-4">Completar pago con PayPal:</h3>
                 
-                <!-- Stripe Payment Button -->
-                <button id="stripe-payment-btn" class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition text-sm text-white flex items-center justify-center gap-2">
-                    💳 Pagar con Tarjeta (Stripe)
-                </button>
-                
-                <!-- PayPal Payment Container -->
                 <div id="paypal-button-container" class="w-full"></div>
                 
-                <button id="back-to-plans" class="w-full px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition text-sm">
+                <button id="back-to-plans" class="w-full px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 transition text-sm mt-4">
                     ← Volver a planes
                 </button>
             </div>
 
             <p class="text-center text-xs text-gray-400 mt-4">
-                Pago seguro con Stripe o PayPal • Cancela cuando quieras
+                Pago 100% seguro con PayPal • Cancela cuando quieras
             </p>
         </div>
     </div>
@@ -651,7 +688,7 @@
 
             <div class="mt-4 text-center">
                 <p class="text-xs text-gray-400">
-                    Con tu cuenta gratis obtienes <span class="text-indigo-400 font-semibold">5 generaciones diarias</span>
+                    Con tu cuenta gratis obtienes <span class="text-indigo-400 font-semibold">5 generaciones para probar</span>
                 </p>
             </div>
         </div>
@@ -820,7 +857,8 @@
             if (paymentStatus === 'success' && plan === 'premium') {
                 userPlan = 'premium';
                 localStorage.setItem('userPlan', 'premium');
-                showSuccessMessage('🎉 ¡Pago exitoso! Bienvenido a Premium con generaciones ilimitadas!');
+                localStorage.setItem('isPremium', 'true'); // Para el nuevo sistema
+                showSuccessMessage('🎉 ¡Pago exitoso! Bienvenido a Premium con 20 generaciones diarias!');
                 
                 // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
@@ -997,17 +1035,82 @@
 
         // --- API & Generation Logic ---
         async function callApiWithBackoff(apiUrl, payload) {
-            // Simplified for brevity, production code should have backoff
+            // Agregar información de usuario para control de límites
+            const userId = getUserId(); // Generar o recuperar ID único de usuario
+            const isPremium = checkPremiumStatus(); // Verificar si es usuario premium
+            
+            const payloadWithUser = {
+                ...payload,
+                userId: userId,
+                isPremium: isPremium
+            };
+            
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payloadWithUser)
             });
+            
             if (!response.ok) {
                 const errorData = await response.json();
+                
+                // Manejar error de límite excedido
+                if (response.status === 429 && errorData.error?.code === 'QUOTA_EXCEEDED') {
+                    const limits = errorData.error.limits;
+                    if (!isPremium) {
+                        showQuotaModal(limits);
+                        throw new Error(errorData.error.message);
+                    }
+                }
+                
                 throw new Error(`API Error: ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
             }
-            return await response.json();
+            
+            const result = await response.json();
+            
+            // Mostrar información de uso si está disponible
+            if (result.usage) {
+                updateUsageDisplay(result.usage);
+            }
+            
+            return result;
+        }
+        
+        // Función para generar/recuperar ID único de usuario
+        function getUserId() {
+            let userId = localStorage.getItem('user_id');
+            if (!userId) {
+                userId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('user_id', userId);
+            }
+            return userId;
+        }
+        
+        // Función para verificar estado premium
+        function checkPremiumStatus() {
+            return localStorage.getItem('isPremium') === 'true' || 
+                   localStorage.getItem('userPlan') === 'premium';
+        }
+        
+        // Función para mostrar modal de límite alcanzado
+        function showQuotaModal(limits) {
+            if (limits.isPermanentLimit) {
+                showError(`🚫 ¡Se acabaron tus ${limits.limit} generaciones gratuitas! 😔 Para seguir creando imágenes increíbles, actualiza a Premium por solo $9.99/mes y disfruta de 10 imágenes diarias sin marca de agua. 🎨✨`);
+            } else {
+                showError(`🚫 Límite diario alcanzado (${limits.used}/${limits.limit}). ¡Se renueva mañana o actualiza a Premium!`);
+            }
+            // Mostrar modal de pricing automáticamente con mensaje urgente
+            setTimeout(() => {
+                document.getElementById('pricing-modal').classList.remove('hidden');
+                // Agregar clase para efecto de urgencia
+                document.getElementById('pricing-modal').classList.add('animate-pulse');
+            }, 1500);
+        }
+        
+        // Función para actualizar display de uso
+        function updateUsageDisplay(usage) {
+            console.log(`📊 Uso: ${usage.used}/${usage.limit} generaciones (${usage.remaining} restantes)`);
+            // Se puede agregar un indicador visual aquí
         }
 
         async function handleImageGeneration(prompt, images, { mask = null, overlay = null } = {}) {
@@ -1037,7 +1140,14 @@
                 const parts = [{ text: prompt }];
                 images.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }));
                 if (mask) parts.push({ inlineData: { mimeType: mask.mimeType, data: mask.data } });
-                const payload = { contents: [{ parts }] };
+                
+                // Obtener calidad de imagen seleccionada
+                const imageQuality = document.getElementById('image-quality')?.value || 'fast';
+                
+                const payload = { 
+                    contents: [{ parts }],
+                    imageQuality: imageQuality
+                };
 
                 const result = await callApiWithBackoff(apiUrl, payload);
                 const candidate = result?.candidates?.[0];
@@ -1054,7 +1164,10 @@
                 if (imagePart && imagePart.inlineData.data) {
                     const mimeType = imagePart.inlineData.mimeType || 'image/png';
                     const imageUrl = `data:${mimeType};base64,${imagePart.inlineData.data}`;
-                    addImageToCarousel(imageUrl);
+                    
+                    // Determinar si es usuario premium
+                    const isPremium = checkPremiumStatus();
+                    addImageToCarousel(imageUrl, !isPremium); // Marca de agua si NO es premium
                 } else {
                     console.error("Invalid API Response:", JSON.stringify(result, null, 2));
                     throw new Error('La respuesta de la API no contiene datos de imagen válidos.');
@@ -1168,16 +1281,33 @@
         });
 
         // --- Carousel Logic ---
-        function addImageToCarousel(imageUrl) {
-            generatedImagesHistory.push(imageUrl);
+        function addImageToCarousel(imageUrl, isWatermarked = false) {
+            generatedImagesHistory.push({url: imageUrl, watermarked: isWatermarked});
             
             if (placeholderSlide.parentElement) {
                 carouselTrack.removeChild(placeholderSlide);
             }
 
             const slide = document.createElement('div');
-            slide.className = 'carousel-slide';
-            slide.innerHTML = `<img src="${imageUrl}" class="max-w-full max-h-[512px] h-full rounded-md object-contain">`;
+            slide.className = `carousel-slide relative ${isWatermarked ? 'watermarked-image' : ''}`;
+            
+            let slideContent = `<img src="${imageUrl}" class="max-w-full max-h-[512px] h-full rounded-md object-contain" ${isWatermarked ? 'draggable="false" oncontextmenu="return false;"' : ''}>`;
+            
+            // Agregar marca de agua para usuarios gratuitos
+            if (isWatermarked) {
+                slideContent += `
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div class="bg-black/50 text-white px-4 py-2 rounded-lg text-sm font-semibold opacity-80 transform rotate-12">
+                            ⚡ ACTUALIZA A PREMIUM PARA DESCARGAR
+                        </div>
+                    </div>
+                    <div class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+                        VERSIÓN DEMO
+                    </div>
+                `;
+            }
+            
+            slide.innerHTML = slideContent;
             carouselTrack.appendChild(slide);
 
             currentImageIndex = generatedImagesHistory.length - 1;
@@ -1194,10 +1324,21 @@
             
             // Show/hide save buttons and edit section
             const hasImages = generatedImagesHistory.length > 0;
-            saveActions.classList.toggle('hidden', !hasImages);
+            const isPremium = checkPremiumStatus();
+            
+            // Solo mostrar botones de guardar si es usuario premium
+            saveActions.classList.toggle('hidden', !hasImages || !isPremium);
             editSection.classList.toggle('hidden', !hasImages && !isDrawingMode);
             overlaySection.classList.toggle('hidden', !hasImages && !isDrawingMode);
-            saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2);
+            saveAlbumBtn.classList.toggle('hidden', generatedImagesHistory.length < 2 || !isPremium);
+            
+            // Mostrar mensaje especial para usuarios gratuitos con imágenes
+            if (hasImages && !isPremium) {
+                showError('👑 Imágenes generadas exitosamente. ¡Actualiza a Premium para descargar sin marca de agua!');
+                setTimeout(() => {
+                    document.getElementById('pricing-modal').classList.remove('hidden');
+                }, 3000);
+            }
             
             if (isDrawingMode || isDrawing) {
                 deactivateDrawingMode();
@@ -1773,54 +1914,11 @@
         });
 
         // Payment method event listeners
-        document.getElementById('stripe-payment-btn').addEventListener('click', async () => {
-            const success = await processStripePayment();
-            if (success) {
-                completePurchase();
-            } else {
-                showError('Error en el pago con Stripe. Intenta nuevamente.');
-            }
-        });
-
         document.getElementById('back-to-plans').addEventListener('click', () => {
             document.querySelector('.space-y-4').style.display = 'block';
             document.querySelector('.flex.flex-col.sm\\:flex-row.gap-3').style.display = 'flex';
             document.getElementById('payment-methods').style.display = 'none';
         });
-
-        async function processStripePayment() {
-            try {
-                // Initialize Stripe (replace with your publishable key)
-                const stripe = Stripe('pk_test_51xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
-                
-                // Create checkout session
-                const response = await fetch('/api/create-checkout-session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        priceId: 'price_premium_monthly', // Your Stripe price ID
-                        userId: userId,
-                        plan: 'premium'
-                    })
-                });
-                
-                const session = await response.json();
-                
-                if (session.url) {
-                    // Redirect to Stripe checkout
-                    window.location.href = session.url;
-                    return true;
-                } else {
-                    console.error('Error creating checkout session:', session.error);
-                    return false;
-                }
-            } catch (error) {
-                console.error('Stripe payment error:', error);
-                return false;
-            }
-        }
 
         async function initializePayPal() {
             try {
@@ -1941,6 +2039,38 @@
                 }, 4000);
             }
         }
+        
+        // Protección anti-captura para usuarios gratuitos
+        function initAntiCaptureProtection() {
+            if (!checkPremiumStatus()) {
+                // Detectar teclas de captura de pantalla
+                document.addEventListener('keydown', function(e) {
+                    // Prevenir Print Screen, F12, Ctrl+Shift+I, etc.
+                    if (e.key === 'PrintScreen' || 
+                        e.key === 'F12' ||
+                        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                        (e.ctrlKey && e.shiftKey && e.key === 'C') ||
+                        (e.ctrlKey && e.key === 'u') ||
+                        (e.ctrlKey && e.key === 's')) {
+                        e.preventDefault();
+                        showError('🚫 Función deshabilitada. Actualiza a Premium para descargar imágenes.');
+                        return false;
+                    }
+                });
+                
+                // Detectar clic derecho en imágenes con marca de agua
+                document.addEventListener('contextmenu', function(e) {
+                    if (e.target.closest('.watermarked-image')) {
+                        e.preventDefault();
+                        showError('🚫 Descarga deshabilitada. Actualiza a Premium.');
+                        return false;
+                    }
+                });
+            }
+        }
+        
+        // Inicializar protección
+        initAntiCaptureProtection();
     </script>
 </body>
 </html>
