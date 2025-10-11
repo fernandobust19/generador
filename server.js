@@ -22,10 +22,7 @@ const GOOGLE_CLOUD_PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
 // Configurar autenticación de Google para Vertex AI
 // En Render, usar Service Account Key desde variable de entorno
 const auth = new GoogleAuth({
-    scopes: [
-        'https://www.googleapis.com/auth/cloud-platform',
-        'https://www.googleapis.com/auth/aiplatform'
-    ],
+    scopes: 'https://www.googleapis.com/auth/cloud-platform',
     // En Render, configurar GOOGLE_APPLICATION_CREDENTIALS_JSON como variable de entorno
     credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ? 
         JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) : undefined
@@ -46,7 +43,7 @@ function getUserLimits(userId, isPremium = false) {
     }
     
     const userData = userUsage.get(userId);
-    const freeLimitTotal = 5;        // 5 generaciones gratis TOTALES para siempre
+    const freeLimitTotal = 10;       // 10 generaciones gratis TOTALES para siempre
     const premiumLimitDaily = 10;    // 10 generaciones diarias para usuarios premium
     
     if (isPremium) {
@@ -197,7 +194,7 @@ app.post('/api/generate', async (req, res) => {
             };
             console.log(`[API SELECTION] Usando Vertex AI para imágenes: ${model}`);
         } catch (authError) {
-            console.error('Error de autenticación con Vertex AI:', authError);
+            console.error('Error de autenticación con Vertex AI:', authError.message);
             return res.status(401).json({ 
                 error: { 
                     message: 'Error de autenticación con Vertex AI. Verifica las credenciales.',
