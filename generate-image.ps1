@@ -9,7 +9,10 @@ param(
   [string]$Model = "imagen-4.0-generate-001",    # Modelos Imagen 4/3/2 GA y preview disponibles en Vertex AI
   [string]$Out = "",
   [int]$SampleCount = 1,
-  [bool]$EnhancePrompt = $true
+  [bool]$EnhancePrompt = $true,
+  [ValidateRange(1.0,30.0)]
+  [double]$CfgScale = 7.0,
+  [string]$NegativePrompt = ""
 )
 
 $PROJECT_ID = "generador-474400"
@@ -100,17 +103,19 @@ $parameters = @{
     mimeType           = "image/png"
     compressionQuality = 90
   }
+  cfgScale         = [Math]::Round($CfgScale, 2)
 }
 if ($Model -like "imagen-4*") {
   $parameters.enhancePrompt = $EnhancePrompt
 }
 
+$instance = @{ prompt = $Prompt }
+if (-not [string]::IsNullOrWhiteSpace($NegativePrompt)) {
+  $instance.negativePrompt = $NegativePrompt
+}
+
 $BODY = @{
-  instances = @(
-    @{
-      prompt = $Prompt
-    }
-  )
+  instances = @($instance)
   parameters = $parameters
 } | ConvertTo-Json -Depth 6
 
@@ -154,7 +159,10 @@ try {
   }
 
   Write-Host "   Prompt: $Prompt"
-  Write-Host "   Modelo: $Model | AR: $AspectRatio | Cantidad: $SampleCount"
+  Write-Host "   Modelo: $Model | AR: $AspectRatio | Cantidad: $SampleCount | CFG: $CfgScale"
+  if (-not [string]::IsNullOrWhiteSpace($NegativePrompt)) {
+    Write-Host "   NegativePrompt: $NegativePrompt"
+  }
 }
 catch {
   Write-Host "❌ Error en la solicitud: $($_.Exception.Message)" -ForegroundColor Red
