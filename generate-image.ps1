@@ -15,6 +15,49 @@ param(
 $PROJECT_ID = "generador-474400"
 $LOCATION   = "us-central1"
 
+function Resolve-ImagePath {
+  param(
+    [string]$BasePath,
+    [int]$Index,
+    [int]$Total,
+    [string]$TimestampTag
+  )
+
+  $tag = if ($TimestampTag) { $TimestampTag } else { (Get-Date).ToString("yyyyMMdd_HHmmss") }
+
+  if ($Total -gt 1) {
+    $dir  = [IO.Path]::GetDirectoryName($BasePath)
+    if ([string]::IsNullOrWhiteSpace($dir)) { $dir = (Get-Location).Path }
+    $name = [IO.Path]::GetFileNameWithoutExtension($BasePath)
+    if ([string]::IsNullOrWhiteSpace($name)) { $name = "img_$tag" }
+    $ext  = [IO.Path]::GetExtension($BasePath)
+    if ([string]::IsNullOrWhiteSpace($ext)) { $ext = ".png" }
+    return Join-Path $dir ("{0}_{1:D2}{2}" -f $name, $Index + 1, $ext)
+  }
+
+  if ([string]::IsNullOrWhiteSpace($BasePath)) {
+    return "img_$tag.png"
+  }
+
+  $ext = [IO.Path]::GetExtension($BasePath)
+  if (-not [string]::IsNullOrWhiteSpace($ext)) {
+    return $BasePath
+  }
+
+  $trimmed = $BasePath.TrimEnd()
+  if ($trimmed.EndsWith([IO.Path]::DirectorySeparatorChar) -or $trimmed.EndsWith([IO.Path]::AltDirectorySeparatorChar) -or (Test-Path $BasePath -PathType Container)) {
+    $directory = $trimmed.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    if ([string]::IsNullOrWhiteSpace($directory)) { $directory = (Get-Location).Path }
+    return Join-Path $directory ("img_{0}.png" -f $tag)
+  }
+
+  $directory = [IO.Path]::GetDirectoryName($BasePath)
+  if ([string]::IsNullOrWhiteSpace($directory)) { $directory = (Get-Location).Path }
+  $name = [IO.Path]::GetFileNameWithoutExtension($BasePath)
+  if ([string]::IsNullOrWhiteSpace($name)) { $name = "img_$tag" }
+  return Join-Path $directory ("{0}.png" -f $name)
+}
+
 if (-not $Prompt -or $Prompt.Trim().Length -eq 0) {
   $Prompt = Read-Host "Escribe el PROMPT (ej: 'Foto realista de casa moderna con techo de teja española al atardecer')"
 }
@@ -24,6 +67,10 @@ if (-not $Out -or $Out.Trim().Length -eq 0) {
   $Out   = "img_${stamp}.png"
 }
 
+if (-not $stamp) {
+  $stamp = (Get-Date).ToString("yyyyMMdd_HHmmss")
+}
+
 if ($SampleCount -lt 1 -or $SampleCount -gt 4) {
   Write-Error "SampleCount debe estar entre 1 y 4."
   exit 5
@@ -31,6 +78,11 @@ if ($SampleCount -lt 1 -or $SampleCount -gt 4) {
 
 Write-Host "Obteniendo token..." -ForegroundColor Cyan
 $TOKEN = (gcloud auth application-default print-access-token)
+if ($TOKEN) { $TOKEN = $TOKEN.Trim() }
+if (-not $TOKEN) {
+  $TOKEN = (gcloud auth print-access-token)
+  if ($TOKEN) { $TOKEN = $TOKEN.Trim() }
+}
 if (-not $TOKEN) {
   Write-Error "No se pudo obtener el token de acceso. Verifica 'gcloud auth application-default login'."
   exit 1
@@ -65,7 +117,7 @@ $BODY = @{
 $URL = "https://$LOCATION-aiplatform.googleapis.com/v1/projects/$PROJECT_ID/locations/$LOCATION/publishers/google/models/$Model:predict"
 
 try {
-  $headers = @{ Authorization = "Bearer $TOKEN"; "Content-Type" = "application/json" }
+  $headers = @{ Authorization = "Bearer $TOKEN"; "Content-Type" = "application/json; charset=utf-8" }
   $resp    = Invoke-RestMethod -Uri $URL -Method POST -Headers $headers -Body $BODY
 
   if (-not $resp.predictions -or $resp.predictions.Count -eq 0) {
@@ -90,18 +142,7 @@ try {
       continue
     }
 
-    if ($SampleCount -eq 1) {
-      $targetPath = $Out
-    }
-    else {
-      $dir  = [IO.Path]::GetDirectoryName($Out)
-      if ([string]::IsNullOrWhiteSpace($dir)) { $dir = (Get-Location).Path }
-      $name = [IO.Path]::GetFileNameWithoutExtension($Out)
-      if ([string]::IsNullOrWhiteSpace($name)) { $name = "img_$((Get-Date).ToString('yyyyMMdd_HHmmss'))" }
-      $ext  = [IO.Path]::GetExtension($Out)
-      if ([string]::IsNullOrWhiteSpace($ext)) { $ext = ".png" }
-      $targetPath = Join-Path $dir ("{0}_{1:D2}{2}" -f $name, $i + 1, $ext)
-    }
+    $targetPath = Resolve-ImagePath -BasePath $Out -Index $i -Total $SampleCount -TimestampTag $stamp
 
     [IO.File]::WriteAllBytes($targetPath, [Convert]::FromBase64String($b64))
     $saveTargets += $targetPath
