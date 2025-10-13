@@ -138,6 +138,13 @@ try {
     console.log('Error stack:', error.stack);
 }
 
+// Presets de calidad para Vertex AI
+const VERTEX_QUALITY_PRESETS = {
+    fast: { guidanceScale: 6 },
+    standard: { guidanceScale: 7.5 },
+    ultra: { guidanceScale: 9 }
+};
+
 // Endpoint que recibirá las peticiones desde tu página web
 app.post('/api/generate', async (req, res) => {
     // Requerimos al menos el ID de proyecto para usar Vertex AI
@@ -262,14 +269,16 @@ Enfócate en un rostro simétrico y natural: ojos bien alineados y centrados, ir
             const requestedRatio = (req.body.aspectRatio || defaultRatio);
             const appliedRatio = allowedRatios.has(requestedRatio) ? requestedRatio : defaultRatio;
 
+            const vertexPreset = VERTEX_QUALITY_PRESETS[qualityLevel] || VERTEX_QUALITY_PRESETS.standard;
+
             apiRequestBody = {
                 instances: [instance],
                 parameters: {
-                    sampleCount: 1, // Generar 1 imagen
+                    sampleCount: 1,
                     aspectRatio: appliedRatio,
                     safetyFilterLevel: 'block_some',
                     personGeneration: 'allow_adult',
-                    // Evitar deformaciones y baja calidad (EN + ES), con refuerzo específico para rostro cuando aplica
+                    guidanceScale: vertexPreset.guidanceScale,
                     negativePrompt: (function(){
                         const baseNeg = [
                             'blurry, low quality, lowres, artifacts, jpeg artifacts, watermark, text, logo, cropped, out of frame',
