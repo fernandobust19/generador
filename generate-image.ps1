@@ -5,8 +5,8 @@
 param(
   [string]$Prompt,
   [string]$AspectRatio = "16:9",                 # 1:1, 3:2, 4:5, 16:9...
-  [ValidateSet("imagen-4.0-generate-001","imagen-4.0-ultra-generate-001","imagen-4.0-fast-generate-001","imagen-3.0-generate-002","imagen-3.0-generate-001","imagen-3.0-fast-generate-001")]
-  [string]$Model = "imagen-4.0-generate-001",
+  [ValidateSet("imagen-4.0-generate-001","imagen-4.0-ultra-generate-001","imagen-4.0-fast-generate-001","imagen-4.0-generate-preview-06-06","imagen-4.0-ultra-generate-preview-06-06","imagen-4.0-fast-generate-preview-06-06","imagen-4.0-generate-preview-05-20","imagen-4.0-ultra-generate-preview-05-20","imagen-4.0-fast-generate-preview-05-20","imagen-3.0-generate-002","imagen-3.0-generate-001","imagen-3.0-fast-generate-001","imagegeneration@006","imagegeneration@005","imagegeneration@002")]
+  [string]$Model = "imagen-4.0-generate-001",    # Modelos Imagen 4/3/2 GA y preview disponibles en Vertex AI
   [string]$Out = "",
   [int]$SampleCount = 1,
   [bool]$EnhancePrompt = $true
