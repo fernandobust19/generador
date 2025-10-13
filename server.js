@@ -144,6 +144,13 @@ const VERTEX_QUALITY_PRESETS = {
     standard: { guidanceScale: 7.5 },
     ultra: { guidanceScale: 9 }
 };
+const VERTEX_SUPPORTED_MODELS = new Set([
+    'imagen-3.0-generate-002',
+    'imagen-3.0-generate-001',
+    'imagen-4.0-generate-001',
+    'imagen-4.0-fast-generate-001'
+]);
+const DEFAULT_VERTEX_MODEL = process.env.VERTEX_MODEL || 'imagen-3.0-generate-002';
 
 // Endpoint que recibirá las peticiones desde tu página web
 app.post('/api/generate', async (req, res) => {
@@ -185,7 +192,8 @@ app.post('/api/generate', async (req, res) => {
     }
 
     // Forzar Vertex AI para toda generación (texto→imagen o edición)
-    let model = 'imagen-3.0-generate-001';
+    const requestedModel = typeof req.body.model === 'string' ? req.body.model : DEFAULT_VERTEX_MODEL;
+    let model = VERTEX_SUPPORTED_MODELS.has(requestedModel) ? requestedModel : DEFAULT_VERTEX_MODEL;
     const location = 'us-central1';
     let apiUrl, headers;
     let isVertexAI = true;
@@ -219,6 +227,14 @@ app.post('/api/generate', async (req, res) => {
             let promptText = req.body.contents?.[0]?.parts?.find(p => p.text)?.text || '';
             // Mejorar calidad según la selección aplicada con presupuesto (por defecto 'standard')
             const qualityLevel = selectedQuality || 'standard';
+            const requestedLanguage = typeof req.body.language === 'string' ? req.body.language : 'es';
+            const enhancePrompt = typeof req.body.enhancePrompt === 'boolean'
+                ? req.body.enhancePrompt
+                : !requestedModel.includes('fast');
+            const outputMimeType = typeof req.body.outputMimeType === 'string' ? req.body.outputMimeType : 'image/png';
+            const compressionQuality = Number.isFinite(req.body.compressionQuality)
+                ? req.body.compressionQuality
+                : 90;
 
             // Detección simple de retratos/personas para activar refuerzos anti-deformaciones faciales
             const faceKeywords = /(cara|rostro|retrato|selfie|headshot|perfil|primer\s*plano|persona|hombre|mujer|niñ[oa]|face|portrait|head\s*shot)/i;
@@ -276,8 +292,10 @@ Enfócate en un rostro simétrico y natural: ojos bien alineados y centrados, ir
                 parameters: {
                     sampleCount: 1,
                     aspectRatio: appliedRatio,
-                    safetyFilterLevel: 'block_some',
+                    safetyFilterLevel: req.body.safetyFilterLevel || 'block_some',
                     personGeneration: 'allow_adult',
+                    language: requestedLanguage,
+                    enhancePrompt,
                     guidanceScale: vertexPreset.guidanceScale,
                     negativePrompt: (function(){
                         const baseNeg = [
@@ -295,7 +313,11 @@ Enfócate en un rostro simétrico y natural: ojos bien alineados y centrados, ir
                             'boca deformada, dientes extra, dientes mal formados, labios fusionados, nariz malformada, orejas deformes, piel de cera, piel plástica, piel sobrealisada'
                         ];
                         return (isPortraitLike ? baseNeg.concat(faceNeg) : baseNeg).join(', ');
-                    })()
+                    })(),
+                    outputOptions: {
+                        mimeType: outputMimeType,
+                        compressionQuality
+                    }
                 }
             };
         }
